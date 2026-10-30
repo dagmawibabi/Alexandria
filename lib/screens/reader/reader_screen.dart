@@ -21,6 +21,7 @@ import '../../services/audio.dart';
 import '../../services/library.dart';
 import '../../services/read_aloud.dart';
 import '../../services/speech.dart';
+import '../../services/volume_keys.dart';
 import '../ai_sheets.dart';
 import '../listen_sheet.dart';
 import '../quote_card.dart';
@@ -41,7 +42,7 @@ class ReaderScreen extends StatefulWidget {
   State<ReaderScreen> createState() => _ReaderScreenState();
 }
 
-class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver, SingleTickerProviderStateMixin, RouteAware {
   Book get book => widget.book;
   ParsedDoc? _doc;
   Object? _error;
@@ -95,6 +96,9 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.addObserver(this);
     if (widget.follow != null) Player.i.addListener(_onAudio);
     ReadAloud.i.addListener(_onReadAloud);
+    for (final l in [Settings.i, Player.i, ReadAloud.i]) {
+      l.addListener(_syncVolumeKeys);
+    }
     _current = book.position;
     _inner = book.positionOffset.clamp(0.0, 1.0);
     book.lastOpenedAt = DateTime.now();
@@ -171,6 +175,12 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     WidgetsBinding.instance.removeObserver(this);
     Player.i.removeListener(_onAudio);
     ReadAloud.i.removeListener(_onReadAloud);
+    for (final l in [Settings.i, Player.i, ReadAloud.i]) {
+      l.removeListener(_syncVolumeKeys);
+    }
+    VolumeKeys.routes.unsubscribe(this);
+    _releaseVolumeKeys();
+    _swipeTurns.close();
     _savePosition(force: true);
     _endSession();
     _ticker.dispose();
@@ -183,6 +193,68 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     ScreenBrightness.instance.resetApplicationScreenBrightness().catchError((_) {});
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  // ------------------------------------------------------------ volume keys
+
+  final _swipeTurns = StreamController<int>.broadcast();
+
+  /// Something is open on top of this reader.
+  bool _covered = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    if (route != null) VolumeKeys.routes.subscribe(this, route);
+  }
+
+  @override
+  void didPush() => _syncVolumeKeys();
+
+  @override
+  void didPushNext() {
+    _covered = true;
+    _syncVolumeKeys();
+  }
+
+  @override
+  void didPopNext() {
+    _covered = false;
+    _syncVolumeKeys();
+  }
+
+  void _syncVolumeKeys() {
+    if (VolumeKeys.wanted(enabled: Settings.i.volumePaging, covered: _covered, audioPlaying: Player.i.playing || ReadAloud.i.active)) {
+      VolumeKeys.onTurn = _volumeTurn;
+      VolumeKeys.capture(true);
+    } else {
+      _releaseVolumeKeys();
+    }
+  }
+
+  /// Leaves them alone if another reader has already taken over.
+  void _releaseVolumeKeys() {
+    if (VolumeKeys.onTurn != _volumeTurn) return;
+    VolumeKeys.onTurn = null;
+    VolumeKeys.capture(false);
+  }
+
+  void _volumeTurn(int key) {
+    final dir = Settings.i.volumePagingSwapped ? -key : key;
+    _lastInteract = DateTime.now();
+    switch (_mode) {
+      case ReadMode.scroll:
+        if (_scroll.hasClients) _page(dir);
+      case ReadMode.swipe:
+        _swipeTurns.add(dir);
+      case ReadMode.pdf:
+        final pdf = _pdf;
+        if (pdf == null || !pdf.isReady) return;
+        final to = (pdf.pageNumber ?? 1) + dir;
+        if (to >= 1 && to <= pdf.pageCount) pdf.goToPage(pageNumber: to);
+        haptic();
+    }
   }
 
   // ------------------------------------------------------------ position
@@ -881,6 +953,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
           onBookmark: _toggleBookmark,
           onSpeak: _sayOnce,
           onTapCenter: () => _setHud(!_hud),
+          turns: _swipeTurns.stream,
         );
       case ReadMode.scroll:
         return ListenableBuilder(

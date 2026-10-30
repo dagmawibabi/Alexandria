@@ -114,6 +114,7 @@ class SwipeReader extends StatefulWidget {
     required this.onBookmark,
     required this.onSpeak,
     required this.onTapCenter,
+    this.turns,
   });
 
   final Book book;
@@ -125,6 +126,9 @@ class SwipeReader extends StatefulWidget {
   final ValueChanged<int> onBookmark;
   final ValueChanged<String> onSpeak;
   final VoidCallback onTapCenter;
+
+  /// +1 or -1 to move a card from outside, for the volume keys.
+  final Stream<int>? turns;
 
   @override
   State<SwipeReader> createState() => _SwipeReaderState();
@@ -143,6 +147,19 @@ class _SwipeReaderState extends State<SwipeReader> with SingleTickerProviderStat
   void initState() {
     super.initState();
     Settings.i.addListener(_schedule);
+    _turns = widget.turns?.listen(_turn);
+  }
+
+  StreamSubscription<int>? _turns;
+
+  void _turn(int dir) {
+    const d = Duration(milliseconds: 300);
+    if (dir > 0) {
+      _pages?.nextPage(duration: d, curve: Curves.easeOutCubic);
+    } else {
+      _pages?.previousPage(duration: d, curve: Curves.easeOutCubic);
+    }
+    haptic();
   }
 
   /// Words per card: fixed, or as many as fill the screen at the current type size.
@@ -188,6 +205,7 @@ class _SwipeReaderState extends State<SwipeReader> with SingleTickerProviderStat
   @override
   void dispose() {
     Settings.i.removeListener(_schedule);
+    _turns?.cancel();
     _auto?.cancel();
     _pages?.dispose();
     _burst.dispose();

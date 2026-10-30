@@ -12,7 +12,8 @@ export default defineConfig({
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
-			adapter: adapter()
+			// Node 26 isn't an available Vercel function runtime yet.
+			adapter: adapter({ runtime: 'nodejs24.x' })
 		})
 	]
 });

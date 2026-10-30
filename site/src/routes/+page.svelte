@@ -145,7 +145,7 @@
           </div>
         </figure>
         <h4>Tap and slide</h4>
-        <p>Tap zones turn the page. Slide the screen edge for brightness or text size, on whichever side you choose.</p>
+        <p>Tap zones turn the page, and so do the volume keys, in whichever direction you like. Slide the screen edge for brightness or text size, on whichever side you choose.</p>
       </div>
     </div>
 

@@ -19,6 +19,7 @@ import 'services/radio.dart';
 import 'services/stat_widgets.dart';
 import 'services/storage.dart';
 import 'services/usage_log.dart';
+import 'services/volume_keys.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
@@ -79,6 +80,7 @@ class _AlexandriaAppState extends State<AlexandriaApp> {
         return MaterialApp(
           title: 'Alexandria',
           navigatorKey: navigatorKey,
+          navigatorObservers: [VolumeKeys.routes],
           debugShowCheckedModeBanner: false,
           themeMode: s.themeMode,
           theme: buildTheme(Brightness.light, s),

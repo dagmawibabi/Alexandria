@@ -306,6 +306,14 @@ class Settings extends ChangeNotifier {
   bool get tapZones => _get('tapZones', true);
   set tapZones(bool v) => set('tapZones', v);
 
+  /// The volume buttons turn pages while reading.
+  bool get volumePaging => _get('volumePaging', true);
+  set volumePaging(bool v) => set('volumePaging', v);
+
+  /// Volume up goes forward instead of volume down.
+  bool get volumePagingSwapped => _get('volumePagingSwapped', false);
+  set volumePagingSwapped(bool v) => set('volumePagingSwapped', v);
+
   bool get showReaderHud => _get('showReaderHud', true);
   set showReaderHud(bool v) => set('showReaderHud', v);
 

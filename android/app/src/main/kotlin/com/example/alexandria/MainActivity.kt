@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
 import android.provider.OpenableColumns
+import android.view.KeyEvent
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -24,6 +25,8 @@ class MainActivity : AudioServiceActivity() {
     private var channel: MethodChannel? = null
     private var initial: List<Map<String, String>> = emptyList()
     private var readAloudLock: PowerManager.WakeLock? = null
+    private var volumeKeys: MethodChannel? = null
+    private var pagingWithVolume = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -60,6 +63,17 @@ class MainActivity : AudioServiceActivity() {
                     result.success(null)
                 }
                 else -> result.notImplemented()
+            }
+        }
+        volumeKeys = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "alexandria/volumekeys").apply {
+            setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "capture" -> {
+                        pagingWithVolume = call.arguments as Boolean
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
             }
         }
         val widgets = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "alexandria/widgets")
@@ -106,6 +120,18 @@ class MainActivity : AudioServiceActivity() {
                 }
             }
         }
+    }
+
+    /** While reading, the volume buttons turn pages: one per press, and the volume stays put. */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val dir = when (event.keyCode) {
+            KeyEvent.KEYCODE_VOLUME_DOWN -> 1
+            KeyEvent.KEYCODE_VOLUME_UP -> -1
+            else -> 0
+        }
+        if (dir == 0 || !pagingWithVolume) return super.dispatchKeyEvent(event)
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) volumeKeys?.invokeMethod("turn", dir)
+        return true
     }
 
     private fun askForNotifications() {
