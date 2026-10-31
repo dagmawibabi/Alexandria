@@ -6,6 +6,7 @@ import '../core/ui.dart';
 import 'book_info_screen.dart';
 import 'folders_screen.dart';
 import 'library_screen.dart' show importBooks, openBook;
+import 'recently_added.dart';
 import '../services/api_cache.dart';
 import '../services/folders.dart';
 import '../services/library.dart';
@@ -118,6 +119,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ]),
               ),
             ),
+            if (_q.text.isEmpty) const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.book})),
             if (saved.isNotEmpty && _q.text.isEmpty) ...[
               SliverToBoxAdapter(child: SectionHeader('', 'Want to read · ${saved.length}', padding: const EdgeInsets.fromLTRB(20, 24, 20, 8))),
               SliverToBoxAdapter(

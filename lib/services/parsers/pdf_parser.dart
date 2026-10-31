@@ -76,7 +76,9 @@ List<Block> _reflow(String text, int page) {
     if (s.isEmpty) return;
     // Lone page numbers / running heads are noise.
     if (RegExp(r'^\d{1,4}$').hasMatch(s)) return;
-    final looksHeading = s.length < 70 && !RegExp(r'[.,;:]$').hasMatch(s) && (s == s.toUpperCase() || RegExp(r'^(chapter|part|section)\b', caseSensitive: false).hasMatch(s));
+    // Scripts without capitals, like Ethiopic, always equal their own upper case.
+    final allCaps = s == s.toUpperCase() && s != s.toLowerCase();
+    final looksHeading = s.length < 70 && !RegExp(r'[.,;:፡-፨]$').hasMatch(s) && (allCaps || RegExp(r'^(chapter|part|section)\b', caseSensitive: false).hasMatch(s));
     out.add(Block(looksHeading ? BlockType.heading : BlockType.paragraph, text: s, level: looksHeading ? 2 : 0, page: page));
   }
 
@@ -97,7 +99,7 @@ List<Block> _reflow(String text, int page) {
       }
     }
     buf.write(line);
-    final endsSentence = RegExp(r'[.!?:"”’)]$').hasMatch(line);
+    final endsSentence = RegExp(r'[.!?:"”’)።፧፨]$').hasMatch(line);
     final short = line.length < typical * .75;
     final nextStartsUpper = i + 1 < lines.length && RegExp(r'^\s*[A-Z“"(\d•–-]').hasMatch(lines[i + 1]);
     if ((endsSentence && short) || (short && nextStartsUpper && line.length < typical * .5)) flush();

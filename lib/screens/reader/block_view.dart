@@ -234,38 +234,49 @@ class SelectionMenu extends StatelessWidget {
               boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .3), blurRadius: 18, offset: const Offset(0, 8))],
             ),
             child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                for (var i = 0; i < highlightColors.length; i++)
-                  tapper(
-                    Container(
-                      width: 30,
-                      height: 30,
-                      margin: const EdgeInsets.only(right: 7),
-                      decoration: BoxDecoration(
-                        color: highlightColors[i],
-                        borderRadius: BorderRadius.circular(t.radius),
-                        border: Border.all(color: marked == i ? fg : Colors.transparent, width: 2.5),
+              // The swatches share whatever the icons leave, so the row always ends flush.
+              SizedBox(
+                width: 316,
+                child: Row(children: [
+                  for (var i = 0; i < highlightColors.length; i++)
+                    Expanded(
+                      child: tapper(
+                        Container(
+                          height: 30,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: highlightColors[i],
+                            borderRadius: BorderRadius.circular(t.radius),
+                            border: Border.all(color: marked == i ? fg : Colors.transparent, width: 2.5),
+                          ),
+                          child: marked == i ? Icon(Icons.check_sharp, size: 16, color: Colors.black.withValues(alpha: .7)) : null,
+                        ),
+                        () => onAction(SelAction.highlight, color: i),
                       ),
-                      child: marked == i ? Icon(Icons.check_sharp, size: 16, color: Colors.black.withValues(alpha: .7)) : null,
                     ),
-                    () => onAction(SelAction.highlight, color: i),
-                  ),
-                Container(width: 1, height: 24, margin: const EdgeInsets.symmetric(horizontal: 4), color: fg.withValues(alpha: .2)),
-                if (marked != null) tapper(Padding(padding: const EdgeInsets.all(5), child: Icon(Icons.format_color_reset_outlined, size: 20, color: fg)), () => onAction(SelAction.unmark)),
-                tapper(Padding(padding: const EdgeInsets.all(5), child: Icon(Icons.bookmark_add_outlined, size: 20, color: fg)), () => onAction(SelAction.bookmark)),
-              ]),
+                  Container(width: 1, height: 24, margin: const EdgeInsets.symmetric(horizontal: 4), color: fg.withValues(alpha: .2)),
+                  if (marked != null) tapper(Padding(padding: const EdgeInsets.all(5), child: Icon(Icons.format_color_reset_outlined, size: 20, color: fg)), () => onAction(SelAction.unmark)),
+                  tapper(Padding(padding: const EdgeInsets.all(5), child: Icon(Icons.bookmark_add_outlined, size: 20, color: fg)), () => onAction(SelAction.bookmark)),
+                ]),
+              ),
               const SizedBox(height: 6),
               SizedBox(
-                height: 30,
                 width: 316,
-                child: ListView(scrollDirection: Axis.horizontal, children: [
+                child: Row(children: [
                   for (final (a, l) in actions)
-                    tapper(
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(2, 6, 12, 6),
-                        child: Text(caps(l), style: mono(context, size: 10.5, color: a == SelAction.explain ? t.accent : fg, weight: FontWeight.w600)),
+                    Expanded(
+                      child: tapper(
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 8),
+                          child: Center(
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(caps(l), maxLines: 1, style: mono(context, size: 10.5, color: a == SelAction.explain ? t.accent : fg, weight: FontWeight.w600)),
+                            ),
+                          ),
+                        ),
+                        () => onAction(a),
                       ),
-                      () => onAction(a),
                     ),
                 ]),
               ),

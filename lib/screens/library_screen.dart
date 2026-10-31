@@ -22,6 +22,7 @@ import 'player_screen.dart';
 import 'podcasts_view.dart';
 import 'radio_view.dart';
 import 'reader/reader_screen.dart';
+import 'recently_added.dart';
 import 'shell.dart';
 import 'stats_screen.dart';
 
@@ -96,7 +97,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
       default:
         list.sort((a, b) => cmpDate(a.lastOpenedAt ?? a.addedAt, b.lastOpenedAt ?? b.addedAt));
     }
-    return list;
+    return lib.newFirst(list);
   }
 
   /// Audiobooks for the current search and filter.
@@ -191,6 +192,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
                       ),
               ),
             ),
+            if (home) const SliverToBoxAdapter(child: RecentlyAdded()),
+            if (_filter == 'books') const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.book})),
+            if (_filter == 'audio') const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.audio})),
+            if (_filter == 'shows') const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.show})),
             if (home) const SliverToBoxAdapter(child: _ContinueRail()),
             if (showBooks) ...[
             SliverToBoxAdapter(

@@ -544,7 +544,7 @@ Future<void> editHighlight(BuildContext context, Book book, Highlight h) {
             child: Text(h.text, maxLines: 6, overflow: TextOverflow.ellipsis, style: const TextStyle(height: 1.45)),
           ),
           const SizedBox(height: 16),
-          Row(children: [
+          Wrap(spacing: 8, runSpacing: 8, children: [
             for (var i = 0; i < highlightColors.length; i++)
               GestureDetector(
                 onTap: () {
@@ -556,7 +556,6 @@ Future<void> editHighlight(BuildContext context, Book book, Highlight h) {
                 child: Container(
                   width: 36,
                   height: 36,
-                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(color: highlightColors[i], borderRadius: t.br, border: Border.all(color: h.color == i ? t.ink : Colors.transparent, width: 2)),
                 ),
               ),

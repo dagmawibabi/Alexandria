@@ -18,6 +18,7 @@ import 'marks.dart';
 import 'media_card.dart';
 import 'player_screen.dart';
 import 'radio_view.dart';
+import 'recently_added.dart';
 
 String fmtDate(DateTime? d) {
   if (d == null) return '';
@@ -167,6 +168,7 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
             child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
               SliverToBoxAdapter(child: _header(context)),
               if (_tab == 'radio') RadioPane(key: _radio) else if (searchMode) ..._searchResults(context) else ...[
+                const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.show})),
                 ..._shows(context),
                 ..._exploreSection(context),
               ],

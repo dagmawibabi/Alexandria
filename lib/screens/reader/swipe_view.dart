@@ -39,13 +39,12 @@ class Chunk {
   bool get isText => type != BlockType.heading && type != BlockType.image;
 }
 
-int _countWords(String s) => s.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).length;
-
 /// Splits the book into cards of about [targetWords], breaking at sentence ends.
 /// Consecutive paragraphs share a card; headings and images get their own.
 List<Chunk> buildChunks(ParsedDoc doc, int targetWords) {
   final out = <Chunk>[];
-  final sentenceEnd = RegExp(r'(?<=[.!?…;:"”’።])\s+');
+  // Ethiopic sentence marks end a sentence even with no space after them.
+  final sentenceEnd = RegExp(r'(?<=[.!?…;:"”’])\s+|(?<=[።፧፨])\s*');
   var parts = <Part>[];
   var words = 0;
 
@@ -71,7 +70,7 @@ List<Chunk> buildChunks(ParsedDoc doc, int targetWords) {
     } else {
       parts.add(Part(block, a, b, text.substring(a, b), type));
     }
-    words += _countWords(text.substring(a, b));
+    words += countWords(text.substring(a, b));
     if (words >= targetWords) flush();
   }
 
@@ -193,7 +192,7 @@ class _SwipeReaderState extends State<SwipeReader> with SingleTickerProviderStat
   void _schedule() {
     _auto?.cancel();
     if (!Settings.i.swipeAuto || _chunks.isEmpty) return;
-    final words = _countWords(_chunks[_index].text).clamp(3, 1000);
+    final words = countWords(_chunks[_index].text).clamp(3, 1000);
     final ms = (words / Settings.i.swipeWpm * 60000).round() + 400;
     _auto = Timer(Duration(milliseconds: ms), () {
       if (!mounted) return;

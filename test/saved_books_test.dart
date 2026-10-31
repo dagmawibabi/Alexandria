@@ -7,6 +7,7 @@ import 'package:alexandria/services/storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final lib = Library.i;
   SavedBook fresh() => SavedBook(key: 'k', title: 'T');
 

@@ -122,8 +122,9 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
       if (!mounted) return;
       setState(() {
         _doc = doc;
-        _current = _current.clamp(0, math.max(0, doc.blocks.length - 1));
-        _startWords = doc.wordOffsets[_current];
+        // A scanned PDF has no blocks: its place is a page, and stays as it is.
+        if (doc.blocks.isNotEmpty) _current = _current.clamp(0, doc.blocks.length - 1);
+        _startWords = _wordsBefore(doc, _current);
         if (book.format == BookFormat.pdf && (Settings.i.pdfOriginal || doc.wordCount < 50)) _mode = ReadMode.pdf;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) => _jumpTo(_current, inner: _inner));
@@ -135,7 +136,8 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
   void _beginSession() {
     _sessionStart = DateTime.now();
     _activeSecs = 0;
-    _startWords = _doc?.wordOffsets[_current] ?? 0;
+    final d = _doc;
+    _startWords = d == null ? 0 : _wordsBefore(d, _current);
     _clock?.cancel();
     _clock = Timer.periodic(const Duration(seconds: 1), (_) {
       final idle = DateTime.now().difference(_lastInteract).inSeconds;
@@ -148,7 +150,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     _clock?.cancel();
     final doc = _doc;
     if (doc == null) return;
-    final words = math.max(0, doc.wordOffsets[_current] - _startWords);
+    final words = math.max(0, _wordsBefore(doc, _current) - _startWords);
     Library.i.addSession(ReadingSession(
       bookId: book.id,
       start: _sessionStart,
@@ -261,9 +263,13 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
 
   double get _progress => _fractionOf(_current, _mode == ReadMode.scroll ? _inner : 0);
 
+  /// Words before [block]. In a scanned PDF [block] is a page and there are no words.
+  int _wordsBefore(ParsedDoc d, int block) => d.wordOffsets[block.clamp(0, d.blocks.length)];
+
   double _fractionOf(int block, [double inner = 0]) {
     final d = _doc;
-    if (d == null || d.blocks.isEmpty) return book.progress;
+    if (d == null) return book.progress;
+    if (d.blocks.isEmpty) return d.pageCount > 1 ? (block / (d.pageCount - 1)).clamp(0.0, 1.0) : book.progress;
     if (d.wordCount == 0) return (block + inner) / d.blocks.length;
     return (d.wordOffsets[block] + inner * d.blocks[block].words) / d.wordCount;
   }
@@ -1150,7 +1156,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     final d = _doc;
     final at = _drag == null ? _current : _blockAt(_drag!);
     final ch = d?.chapterAt(at);
-    final wordsLeft = d == null ? 0 : d.wordCount - d.wordOffsets[at];
+    final wordsLeft = d == null ? 0 : d.wordCount - _wordsBefore(d, at);
     final minsLeft = (wordsLeft / 230).round();
     Widget tool(IconData i, String l, VoidCallback f, {bool on = false}) => Expanded(
           child: GestureDetector(

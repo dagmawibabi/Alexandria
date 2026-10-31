@@ -62,6 +62,8 @@ const highlightColors = <Color>[
   Color(0xFF7FD1AE),
   Color(0xFF7FB2FF),
   Color(0xFFD59BFF),
+  Color(0xFFFF8FC0),
+  Color(0xFF5FD3E0),
 ];
 
 const readerFonts = <String>[

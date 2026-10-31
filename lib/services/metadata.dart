@@ -160,7 +160,7 @@ class Metadata {
     return top;
   }
 
-  static String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), '').trim();
+  static String _norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^\p{L}\p{M}\p{N} ]', unicode: true), '').trim();
 
   static Future<Uint8List?> download(String url) async {
     try {
@@ -247,7 +247,7 @@ class Dictionary {
   static final Map<String, DictEntry> _cache = {};
 
   static Future<DictEntry> lookup(String raw) async {
-    final word = raw.trim().replaceAll(RegExp(r'^[^\w]+|[^\w]+$'), '');
+    final word = raw.trim().replaceAll(RegExp(r'^[^\p{L}\p{M}\p{N}_]+|[^\p{L}\p{M}\p{N}_]+$', unicode: true), '');
     final key = word.toLowerCase();
     if (_cache[key] != null) return _cache[key]!;
 

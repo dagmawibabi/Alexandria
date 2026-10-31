@@ -16,6 +16,7 @@ import 'book_info_screen.dart' show NetCover;
 import 'player_screen.dart';
 import 'downloads_screen.dart';
 import 'media_card.dart';
+import 'recently_added.dart';
 
 class AudiobooksScreen extends StatefulWidget {
   const AudiobooksScreen({super.key});
@@ -149,6 +150,7 @@ class _AudiobooksScreenState extends State<AudiobooksScreen> {
     }
     final current = _shelfFilter == 'all' ? books.where((b) => !b.finished && (b.lastPlayedAt != null)).firstOrNull : null;
     return [
+      if (_shelfFilter == 'all') const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.audio})),
       if (current != null) ...[
         const SliverToBoxAdapter(child: SectionHeader('01', 'Continue listening', padding: EdgeInsets.fromLTRB(20, 22, 20, 10))),
         SliverToBoxAdapter(child: _ContinueListening(book: current)),

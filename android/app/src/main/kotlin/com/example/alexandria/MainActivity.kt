@@ -119,6 +119,9 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+            // audio_service keeps the engine alive after the activity closes. Flutter then
+            // has already asked for its initial files, so a new activity has to tell it.
+            if (initial.isNotEmpty()) invokeMethod("files", initial)
         }
     }
 
@@ -148,6 +151,8 @@ class MainActivity : AudioServiceActivity() {
 
     private fun extract(intent: Intent?): List<Map<String, String>> {
         if (intent == null) return emptyList()
+        // Reopened from recents: the same intent again, already handled.
+        if (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return emptyList()
         val uris = mutableListOf<Uri>()
         when (intent.action) {
             Intent.ACTION_VIEW -> intent.data?.let { uris.add(it) }

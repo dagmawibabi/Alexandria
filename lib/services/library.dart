@@ -3,8 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 
+import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:path/path.dart' as p;
 
 import '../core/settings.dart';
@@ -51,6 +53,23 @@ class Library extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _notifyAfterFrame = false;
+
+  /// Waits for the frame to finish when called during one. The reader saves as it
+  /// opens and closes, in the middle of a build or teardown, when listeners on
+  /// other screens aren't allowed to rebuild.
+  @override
+  void notifyListeners() {
+    final binding = SchedulerBinding.instance;
+    if (binding.schedulerPhase != SchedulerPhase.persistentCallbacks) return super.notifyListeners();
+    if (_notifyAfterFrame) return;
+    _notifyAfterFrame = true;
+    binding.addPostFrameCallback((_) {
+      _notifyAfterFrame = false;
+      super.notifyListeners();
+    });
+  }
+
   final Map<String, Timer> _pending = {};
 
   /// Debounced persistence per collection.
@@ -79,24 +98,60 @@ class Library extends ChangeNotifier {
   /// Your copy of a catalogue book. A file's own title often differs from the
   /// catalogue's, and copies from before [Book.sourceKey] only have a title to go on.
   Book? copyOf(BookInfo info) {
-    String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^\p{L}\p{M}\p{N} ]', unicode: true), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
     final title = norm(info.title);
     return books.where((b) => info.key.isNotEmpty && b.sourceKey == info.key).firstOrNull ?? books.where((b) => norm(b.title) == title).firstOrNull;
   }
 
   // ---------------- import ----------------
 
+  /// Books added since the app started, and when.
+  final Map<String, DateTime> _added = {};
+
+  /// [sorted] with what was just added and not opened since in front, newest
+  /// first, so a new book is easy to find whatever the list is sorted by.
+  List<Book> newFirst(List<Book> sorted) {
+    bool isNew(Book b) {
+      final at = _added[b.id];
+      return at != null && (b.lastOpenedAt == null || b.lastOpenedAt!.isBefore(at));
+    }
+
+    final front = sorted.where(isNew).toList()..sort((a, b) => _added[b.id]!.compareTo(_added[a.id]!));
+    return [...front, ...sorted.where((b) => !isNew(b))];
+  }
+
+  /// The format of a file by its contents: PDF header, or what's inside the zip.
+  static BookFormat? formatFromBytes(List<int> bytes) {
+    if (bytes.length < 4) return null;
+    final head = String.fromCharCodes(bytes.take(4));
+    if (head == '%PDF') return BookFormat.pdf;
+    if (!head.startsWith('PK')) return null;
+    try {
+      final names = ZipDecoder().decodeBytes(bytes).files.map((f) => f.name).toSet();
+      if (names.contains('META-INF/container.xml')) return BookFormat.epub;
+      if (names.contains('word/document.xml')) return BookFormat.docx;
+    } catch (_) {}
+    return null;
+  }
+
   /// Imports a file into the library (copied into app storage).
   /// Returns the existing book if the same file was imported before.
   Future<Book> importFile(String sourcePath, {String? displayName}) async {
-    final format = formatFromPath(displayName ?? sourcePath) ?? formatFromPath(sourcePath);
-    if (format == null) throw const FormatException('Unsupported file. Alexandria reads PDF, EPUB and DOCX.');
     final src = File(sourcePath);
     final bytes = await src.readAsBytes();
+    // Other apps often hand over a file with no usable name.
+    final format = formatFromPath(displayName ?? sourcePath) ?? formatFromPath(sourcePath) ?? formatFromBytes(bytes);
+    if (format == null) throw const FormatException('Unsupported file. Alexandria reads PDF, EPUB and DOCX.');
     final id = sha1.convert(bytes.length > 4 << 20 ? [...bytes.sublist(0, 4 << 20), ...utf8.encode('${bytes.length}')] : bytes).toString().substring(0, 16);
 
     final existing = byId(id);
-    if (existing != null) return existing;
+    if (existing != null) {
+      existing.addedAt = DateTime.now();
+      _added[id] = existing.addedAt;
+      _persist('books');
+      notifyListeners();
+      return existing;
+    }
 
     importing.value = {...importing.value, id: 0};
     try {
@@ -122,6 +177,7 @@ class Library extends ChangeNotifier {
         book.coverPath = c.path;
       }
       books.insert(0, book);
+      _added[id] = DateTime.now();
       _persist('books');
       notifyListeners();
 

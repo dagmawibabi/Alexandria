@@ -3,6 +3,12 @@
 /// table of contents pointing into that list.
 enum BlockType { heading, paragraph, quote, image, rule }
 
+/// What separates words: spaces, and in Ethiopic text the word and sentence
+/// marks (፡ ። ፣ ፤ ፥ ፦ ፧ ፨), which often have no space around them.
+final wordBreak = RegExp(r'[\s፡-፨]+');
+
+int countWords(String s) => s.split(wordBreak).where((w) => w.isNotEmpty).length;
+
 class Block {
   const Block(this.type, {this.text = '', this.level = 0, this.image, this.page});
 
@@ -18,7 +24,7 @@ class Block {
   /// Original page (PDF only), 0-based.
   final int? page;
 
-  int get words => text.isEmpty ? 0 : text.split(RegExp(r'\s+')).length;
+  int get words => countWords(text);
 
   Map<String, dynamic> toJson() => {
         't': type.index,

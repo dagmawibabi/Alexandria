@@ -9,16 +9,22 @@ class IncomingFiles {
 
   static void Function(List<({String path, String name})>)? onFiles;
 
+  /// A launch can arrive both ways; each copy is one file to open, once.
+  static final _seen = <String>{};
+
+  static List<({String path, String name})> _unseen(List<({String path, String name})> files) => files.where((f) => _seen.add(f.path)).toList();
+
   static Future<void> init() async {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'files') onFiles?.call(_decode(call.arguments));
+      final handler = onFiles;
+      if (call.method == 'files' && handler != null) handler(_unseen(_decode(call.arguments)));
     });
   }
 
   /// Files the app was launched with.
   static Future<List<({String path, String name})>> initial() async {
     try {
-      return _decode(await _channel.invokeMethod('initialFiles'));
+      return _unseen(_decode(await _channel.invokeMethod('initialFiles')));
     } on MissingPluginException {
       return const [];
     } on PlatformException {

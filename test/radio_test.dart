@@ -24,6 +24,7 @@ Map<String, dynamic> station(String id, String name, {String url = 'https://s.te
     };
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final dir = RadioDirectory.i;
 
   setUp(() {

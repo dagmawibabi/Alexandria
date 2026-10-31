@@ -9,7 +9,7 @@ import '../core/ui.dart';
 import '../services/ai.dart';
 import '../services/speech.dart';
 
-/// Voice setup for read-aloud. With [play], ends in a "Start listening"
+/// Voice setup for read-aloud. With [play], leads with a "Start listening"
 /// button and returns true when the reader should begin.
 Future<bool> showListenSheet(BuildContext context, {bool play = true}) async {
   await Ai.ready;
@@ -112,6 +112,15 @@ class _ListenPanelState extends State<ListenPanel> {
           const SizedBox(height: 6),
           const Text('Who reads to you', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
           const SizedBox(height: 14),
+          if (widget.play) ...[
+            PrimaryButton(
+              ready ? 'Start listening' : 'Start with device voice',
+              icon: Icons.play_arrow_sharp,
+              expand: true,
+              onTap: () => Navigator.pop(context, true),
+            ),
+            const SizedBox(height: 14),
+          ],
           for (final e in Speech.engines) _engineRow(context, e),
           if (_engine != 'device') ...[
             const SizedBox(height: 4),
@@ -136,15 +145,6 @@ class _ListenPanelState extends State<ListenPanel> {
           SliderRow(label: 'Speed', value: s.ttsRate, min: .2, max: 1, format: (v) => '${(v * 2).toStringAsFixed(2)}×', onChanged: (v) => s.ttsRate = v),
           if (Speech.engine == 'device')
             SliderRow(label: 'Pitch', value: s.ttsPitch, min: .5, max: 2, format: (v) => v.toStringAsFixed(2), onChanged: (v) => s.ttsPitch = v),
-          if (widget.play) ...[
-            const SizedBox(height: 14),
-            PrimaryButton(
-              ready ? 'Start listening' : 'Start with device voice',
-              icon: Icons.play_arrow_sharp,
-              expand: true,
-              onTap: () => Navigator.pop(context, true),
-            ),
-          ],
         ]);
       },
     );

@@ -41,18 +41,21 @@
                 <data android:scheme="content"/>
                 <data android:scheme="file"/>
                 <data android:mimeType="application/pdf"/>
+                <data android:mimeType="application/x-pdf"/>
                 <data android:mimeType="application/epub+zip"/>
+                <data android:mimeType="application/epub"/>
+                <data android:mimeType="application/x-epub"/>
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
+                <!-- Chat apps often send this, with an address that has no file name in it -->
+                <data android:mimeType="application/octet-stream"/>
             </intent-filter>
 
-            <!-- Apps that send a generic type but keep the file extension -->
+            <!-- Plain file addresses that come with no type at all -->
             <intent-filter android:label="Read in Alexandria">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
-                <data android:scheme="content"/>
                 <data android:scheme="file"/>
                 <data android:host="*"/>
-                <data android:mimeType="application/octet-stream"/>
                 <data android:pathPattern=".*\\.epub"/>
                 <data android:pathPattern=".*\\..*\\.epub"/>
                 <data android:pathPattern=".*\\.pdf"/>
@@ -65,7 +68,10 @@
                 <action android:name="android.intent.action.SEND_MULTIPLE"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <data android:mimeType="application/pdf"/>
+                <data android:mimeType="application/x-pdf"/>
                 <data android:mimeType="application/epub+zip"/>
+                <data android:mimeType="application/epub"/>
+                <data android:mimeType="application/x-epub"/>
                 <data android:mimeType="application/vnd.openxmlformats-officedocument.wordprocessingml.document"/>
                 <data android:mimeType="application/octet-stream"/>
             </intent-filter>

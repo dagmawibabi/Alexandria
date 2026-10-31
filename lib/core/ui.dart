@@ -658,8 +658,7 @@ class GeneratedCover extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             if (!short) ...[
               Row(children: [
-                Text(book.formatLabel, style: monoFont(color: fg.withValues(alpha: .7), fontSize: 8 * scale, letterSpacing: 1)),
-                const Spacer(),
+                Expanded(child: Text(book.formatLabel, maxLines: 1, overflow: TextOverflow.clip, softWrap: false, style: monoFont(color: fg.withValues(alpha: .7), fontSize: 8 * scale, letterSpacing: 1))),
                 Text('№${(h % 999).toString().padLeft(3, '0')}', style: monoFont(color: fg.withValues(alpha: .7), fontSize: 8 * scale)),
               ]),
               SizedBox(height: 6 * scale),

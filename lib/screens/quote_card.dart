@@ -220,14 +220,13 @@ class _QuoteStudioState extends State<QuoteStudio> {
           const SizedBox(height: 16),
           const Label('Marker colour'),
           const SizedBox(height: 8),
-          Row(children: [
+          Wrap(spacing: 8, runSpacing: 8, children: [
             for (var i = 0; i < highlightColors.length; i++)
               GestureDetector(
                 onTap: () => setState(() => _color = i),
                 child: Container(
                   width: 34,
                   height: 34,
-                  margin: const EdgeInsets.only(right: 8),
                   decoration: BoxDecoration(color: highlightColors[i], borderRadius: t.br, border: Border.all(color: _color == i ? t.ink : Colors.transparent, width: 2)),
                 ),
               ),
