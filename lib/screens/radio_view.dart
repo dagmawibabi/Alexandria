@@ -11,6 +11,7 @@ import '../services/library.dart';
 import '../services/radio.dart';
 import 'marks.dart';
 import 'media_card.dart';
+import 'player_screen.dart' show playStation;
 import 'podcasts_view.dart' show PodcastArt;
 
 /// Global Radio: browse, search by name and country, favourites and recents.
@@ -358,7 +359,11 @@ Future<void> showStationMenu(BuildContext context, Station s) {
               Wrap(spacing: 6, runSpacing: 6, children: [for (final tag in s.tags.take(6)) Tag(tag)]),
             ],
             const SizedBox(height: 16),
-            PrimaryButton(on && Player.i.playing ? 'Pause' : 'Listen live', icon: on && Player.i.playing ? Icons.pause_sharp : Icons.play_arrow_sharp, expand: true, onTap: () => dir.play(s)),
+            PrimaryButton(on && Player.i.playing ? 'Pause' : 'Listen live', icon: on && Player.i.playing ? Icons.pause_sharp : Icons.play_arrow_sharp, expand: true, onTap: () {
+              // Starting one leaves this sheet for the full player.
+              if (!on && Settings.i.openPlayerOnPlay) Navigator.pop(ctx);
+              playStation(context, s);
+            }),
             const SizedBox(height: 14),
             MarksBar(mark: dir.markOf(s.id), title: s.name, changed: () => dir.changed(s), folders: () => dir.foldersOf(s.id), onFolder: (id) => dir.toggleFolder(s, id)),
             const SizedBox(height: 14),

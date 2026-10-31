@@ -41,6 +41,7 @@ class Book {
     this.wordCount = 0,
     this.fileSize = 0,
     this.metadataFetched = false,
+    this.sourceKey = '',
   }) : addedAt = addedAt ?? DateTime.now();
 
   final String id;
@@ -75,6 +76,9 @@ class Book {
   int fileSize;
   bool metadataFetched;
 
+  /// The catalogue entry this copy was downloaded from, if any.
+  String sourceKey;
+
   String get formatLabel => format.name.toUpperCase();
 
   Map<String, dynamic> toJson() => {
@@ -105,6 +109,7 @@ class Book {
         'wordCount': wordCount,
         'fileSize': fileSize,
         'metadataFetched': metadataFetched,
+        'sourceKey': sourceKey,
       };
 
   factory Book.fromJson(Map<String, dynamic> j) => Book(
@@ -135,6 +140,7 @@ class Book {
         wordCount: j['wordCount'] ?? 0,
         fileSize: j['fileSize'] ?? 0,
         metadataFetched: j['metadataFetched'] ?? false,
+        sourceKey: j['sourceKey'] ?? '',
       );
 }
 

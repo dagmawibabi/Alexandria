@@ -76,6 +76,14 @@ class Library extends ChangeNotifier {
 
   Book? byId(String id) => books.where((b) => b.id == id).firstOrNull;
 
+  /// Your copy of a catalogue book. A file's own title often differs from the
+  /// catalogue's, and copies from before [Book.sourceKey] only have a title to go on.
+  Book? copyOf(BookInfo info) {
+    String norm(String s) => s.toLowerCase().replaceAll(RegExp(r'[^a-z0-9 ]'), ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+    final title = norm(info.title);
+    return books.where((b) => info.key.isNotEmpty && b.sourceKey == info.key).firstOrNull ?? books.where((b) => norm(b.title) == title).firstOrNull;
+  }
+
   // ---------------- import ----------------
 
   /// Imports a file into the library (copied into app storage).

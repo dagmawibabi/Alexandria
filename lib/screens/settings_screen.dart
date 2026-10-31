@@ -48,6 +48,7 @@ class SettingsScreen extends StatelessWidget {
             _Row(Icons.swipe_sharp, 'Motion & gestures', 'Auto-scroll, swipe cards, tap zones', () => _open(context, 'Motion & gestures', const MotionControls(showListen: false))),
             const _Group('Listening'),
             _Row(Icons.record_voice_over_outlined, 'Read-aloud voice', Speech.summary, () => _open(context, 'Read-aloud voice', const ListenPanel())),
+            _Row(Icons.open_in_full_sharp, 'Player', s.openPlayerOnPlay ? 'Opens full screen when you press play' : 'Stays in the mini player', () => _open(context, 'Player', const _Player())),
             _Row(Icons.podcasts_sharp, 'New-episode alerts', s.podcastAlerts ? 'Every ${s.podcastCheckHours} hours' : 'Off', () => _open(context, 'New-episode alerts', const _PodcastAlerts())),
             const _Group('Assistant'),
             _Row(Icons.auto_awesome_outlined, 'AI companion', Ai.configured ? Ai.model : 'Not connected', () => _open(context, 'AI companion', const _AiPage())),
@@ -206,6 +207,23 @@ class _Library extends StatelessWidget {
           SettingToggle(title: 'Auto-fetch covers & info', hint: 'Looks new books up in Open Library and Google Books when you add them.', value: s.autoFetchMetadata, onChanged: (v) => s.autoFetchMetadata = v),
         ]);
       },
+    );
+  }
+}
+
+class _Player extends StatelessWidget {
+  const _Player();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Settings.i,
+      builder: (context, _) => SettingToggle(
+        title: 'Open the full player on play',
+        hint: 'When you start a podcast episode, or a station from its details. Off, it plays in the mini player and you stay where you are.',
+        value: Settings.i.openPlayerOnPlay,
+        onChanged: (v) => Settings.i.openPlayerOnPlay = v,
+      ),
     );
   }
 }

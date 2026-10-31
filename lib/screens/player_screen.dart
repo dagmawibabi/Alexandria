@@ -6,10 +6,13 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/net_image.dart';
 import '../core/search_box.dart';
+import '../core/settings.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../models/audiobook.dart';
 import '../models/book.dart';
+import '../models/podcast.dart';
+import '../models/radio.dart';
 import '../services/audio.dart';
 import '../services/downloads.dart';
 import '../services/library.dart';
@@ -33,6 +36,23 @@ String fmtClock(Duration d) {
 Future<void> playAudiobook(BuildContext context, Audiobook b, {int? track}) async {
   Player.i.open(b, track: track);
   await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
+}
+
+/// Plays [e] and opens the full player if that's set. On the episode already loaded, this only pauses or resumes.
+Future<void> playEpisode(BuildContext context, Episode e) async {
+  final starting = !Podcasts.i.isCurrent(e);
+  // Playing takes it out of the queue, and the row calling this may go with it.
+  final nav = Navigator.of(context);
+  Podcasts.i.play(e);
+  if (starting && Settings.i.openPlayerOnPlay) await nav.push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
+}
+
+/// Plays [s] and opens the full player if that's set. On the station already loaded, this only pauses or resumes.
+Future<void> playStation(BuildContext context, Station s) async {
+  final starting = !RadioDirectory.i.isCurrent(s.id);
+  final nav = Navigator.of(context);
+  RadioDirectory.i.play(s);
+  if (starting && Settings.i.openPlayerOnPlay) await nav.push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
 }
 
 /// An audiobook's cover: saved file, then catalogue URL, then a generated one.
@@ -693,6 +713,19 @@ class _BookPickerState extends State<_BookPicker> {
                 ),
         ),
       ]),
+    );
+  }
+}
+
+/// [MiniPlayer] for a page outside the tabs, with no tab bar to keep it off the screen's edge.
+class PagePlayer extends StatelessWidget {
+  const PagePlayer({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([Player.i, ReadAloud.i]),
+      builder: (context, _) => Player.i.book == null && !ReadAloud.i.active ? const SizedBox.shrink() : const SafeArea(top: false, child: MiniPlayer()),
     );
   }
 }

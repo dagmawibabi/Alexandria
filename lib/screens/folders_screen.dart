@@ -490,6 +490,7 @@ class _FolderContentsState extends State<_FolderContents> {
         final items = _shown();
         final grid = Settings.i.folderGrid;
         return Scaffold(
+          bottomNavigationBar: const PagePlayer(),
           appBar: AppBar(
             title: AppTitle(f?.name ?? (widget.smart == 'fav' ? 'Favourites' : 'Not in a folder')),
             actions: [

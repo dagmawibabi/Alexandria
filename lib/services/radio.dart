@@ -22,8 +22,14 @@ class RadioDirectory extends ChangeNotifier {
 
   static const genres = [
     ('news', 'News'), ('talk', 'Talk'), ('pop', 'Pop'), ('rock', 'Rock'), ('jazz', 'Jazz'), ('classical', 'Classical'), //
-    ('hiphop', 'Hip hop'), ('afrobeats', 'Afrobeats'), ('rnb', 'R&B'), ('reggae', 'Reggae'), ('dance', 'Dance'), ('ambient', 'Ambient'),
-    ('lofi', 'Lo-fi'), ('gospel', 'Gospel'), ('sports', 'Sports'), ('country', 'Country'), ('latin', 'Latin'), ('80s', '80s'), ('90s', '90s'),
+    ('christian', 'Christian'), ('gospel', 'Gospel'), ('catholic', 'Catholic'), ('islamic', 'Islamic'), //
+    ('hiphop', 'Hip hop'), ('afrobeats', 'Afrobeats'), ('rnb', 'R&B'), ('soul', 'Soul'), ('funk', 'Funk'), ('blues', 'Blues'), ('reggae', 'Reggae'), //
+    ('dance', 'Dance'), ('electronic', 'Electronic'), ('house', 'House'), ('techno', 'Techno'), ('trance', 'Trance'), ('disco', 'Disco'), //
+    ('alternative', 'Alternative'), ('indie', 'Indie'), ('classic rock', 'Classic rock'), ('metal', 'Metal'), ('punk', 'Punk'), //
+    ('ambient', 'Ambient'), ('lofi', 'Lo-fi'), ('chillout', 'Chillout'), ('lounge', 'Lounge'), ('easy listening', 'Easy listening'), ('smooth jazz', 'Smooth jazz'), ('instrumental', 'Instrumental'), ('piano', 'Piano'), ('meditation', 'Meditation'), //
+    ('country', 'Country'), ('folk', 'Folk'), ('world music', 'World'), ('latin', 'Latin'), ('salsa', 'Salsa'), ('cumbia', 'Cumbia'), ('reggaeton', 'Reggaeton'), ('arabic', 'Arabic'), ('anime', 'Anime'), //
+    ('top 40', 'Top 40'), ('oldies', 'Oldies'), ('60s', '60s'), ('70s', '70s'), ('80s', '80s'), ('90s', '90s'), ('2000s', '2000s'), //
+    ('sports', 'Sports'), ('public radio', 'Public radio'), ('culture', 'Culture'), ('education', 'Education'), ('comedy', 'Comedy'), ('kids', 'Kids'), ('old time radio', 'Old-time radio'), ('christmas', 'Christmas'),
   ];
 
   /// Stations worth keeping: favourited, rated, noted, filed or recently played.

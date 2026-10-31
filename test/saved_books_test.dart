@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:alexandria/models/book.dart';
 import 'package:alexandria/services/library.dart';
+import 'package:alexandria/services/metadata.dart';
 import 'package:alexandria/services/storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +13,30 @@ void main() {
   setUp(() {
     Storage.data = Directory.systemTemp.createTempSync('saved');
     lib.saved.clear();
+    lib.books.clear();
+  });
+
+  group('your copy of a catalogue book', () {
+    Book book(String title, {String sourceKey = ''}) => Book(id: title, title: title, format: BookFormat.epub, path: '', sourceKey: sourceKey);
+
+    test('is found by where it was downloaded from, whatever the file calls itself', () {
+      lib.books.add(book('Frankenstein', sourceKey: 'gutenberg:84'));
+      expect(lib.copyOf(BookInfo(title: 'Frankenstein; Or, The Modern Prometheus', key: 'gutenberg:84'))?.id, 'Frankenstein');
+    });
+
+    test('copies from before the key was kept are found by title', () {
+      lib.books.add(book('Alice’s Adventures in Wonderland'));
+      expect(lib.copyOf(BookInfo(title: 'alice s adventures in wonderland', key: 'gutenberg:11')), isNotNull);
+    });
+
+    test('another book is not a copy', () {
+      lib.books.add(book('Emma', sourceKey: 'gutenberg:158'));
+      expect(lib.copyOf(BookInfo(title: 'Persuasion', key: 'gutenberg:105')), isNull);
+    });
+
+    test('the download source survives saving', () {
+      expect(Book.fromJson(book('Emma', sourceKey: 'gutenberg:158').toJson()).sourceKey, 'gutenberg:158');
+    });
   });
 
   test('hearting a book does not save it', () {

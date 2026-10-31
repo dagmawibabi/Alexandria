@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../core/net_image.dart';
 import '../core/search_box.dart';
+import '../core/settings.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../models/podcast.dart';
@@ -15,6 +16,7 @@ import 'downloads_screen.dart';
 import 'folders_screen.dart';
 import 'marks.dart';
 import 'media_card.dart';
+import 'player_screen.dart';
 import 'radio_view.dart';
 
 String fmtDate(DateTime? d) {
@@ -440,6 +442,7 @@ void openEpisodes(BuildContext context, String title, List<Episode> Function() e
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => Scaffold(
       appBar: AppBar(title: AppTitle(title)),
+      bottomNavigationBar: const PagePlayer(),
       body: ListenableBuilder(
         listenable: Listenable.merge([Podcasts.i, Player.i, Downloads.i]),
         builder: (context, _) {
@@ -514,6 +517,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
     final t = Tokens.of(context);
     return Scaffold(
       appBar: AppBar(title: AppTitle('Podcast')),
+      bottomNavigationBar: const PagePlayer(),
       body: FutureBuilder<Podcast?>(
         future: _feed,
         // Show what we already know while the feed refreshes.
@@ -571,7 +575,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                           }),
                         ),
                         const SizedBox(width: 10),
-                        if (pod.episodes.isNotEmpty) ToolButton(Icons.play_arrow_sharp, size: 48, tooltip: 'Play latest', onTap: () => Podcasts.i.play(pod.episodes.first)),
+                        if (pod.episodes.isNotEmpty) ToolButton(Icons.play_arrow_sharp, size: 48, tooltip: 'Play latest', onTap: () => playEpisode(context, pod.episodes.first)),
                         const SizedBox(width: 10),
                         ToolButton(Icons.ios_share_sharp, size: 48, tooltip: 'Share card', onTap: () => showMediaCard(context, ShareItem.podcast(pod, Podcasts.i.showMark(pod.feedUrl)))),
                       ]),
@@ -676,7 +680,7 @@ class EpisodeRow extends StatelessWidget {
                 child: Padding(padding: const EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2, value: dl < 0 ? null : dl)),
               ),
             ),
-          ToolButton(playing ? Icons.pause_sharp : Icons.play_arrow_sharp, size: 40, active: current, tooltip: playing ? 'Pause' : 'Play', onTap: () => pods.play(e)),
+          ToolButton(playing ? Icons.pause_sharp : Icons.play_arrow_sharp, size: 40, active: current, tooltip: playing ? 'Pause' : 'Play', onTap: () => playEpisode(context, e)),
         ]),
       ),
     );
@@ -723,7 +727,9 @@ Future<void> showEpisode(BuildContext context, Episode e, {Podcast? podcast}) {
             Row(children: [
               Expanded(
                 child: PrimaryButton(pods.isPlaying(e) ? 'Pause' : (pods.progressOf(e) > 0 && !played ? 'Resume' : 'Play'), icon: pods.isPlaying(e) ? Icons.pause_sharp : Icons.play_arrow_sharp, onTap: () {
-                  pods.play(e);
+                  // Starting one leaves this sheet for the full player.
+                  if (!pods.isCurrent(e) && Settings.i.openPlayerOnPlay) Navigator.pop(ctx);
+                  playEpisode(context, e);
                 }),
               ),
               const SizedBox(width: 10),

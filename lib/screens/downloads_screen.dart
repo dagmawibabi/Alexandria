@@ -75,6 +75,7 @@ class EpisodeDownloadsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: AppTitle('Downloaded episodes')),
+      bottomNavigationBar: const PagePlayer(),
       body: ListenableBuilder(
         listenable: Listenable.merge([Podcasts.i, Downloads.i, Player.i]),
         builder: (context, _) {

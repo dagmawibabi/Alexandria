@@ -342,6 +342,10 @@ class Settings extends ChangeNotifier {
   set swipeWpm(int v) => set('swipeWpm', v);
 
   // ---------- listen ----------
+  /// Starting a podcast episode or a station from its details opens the full player.
+  bool get openPlayerOnPlay => _get('openPlayerOnPlay', true);
+  set openPlayerOnPlay(bool v) => set('openPlayerOnPlay', v);
+
   double get ttsRate => _get('ttsRate', 0.5);
   set ttsRate(double v) => set('ttsRate', v);
 

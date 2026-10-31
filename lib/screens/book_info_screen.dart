@@ -16,6 +16,7 @@ import '../services/metadata.dart';
 import 'ai_sheets.dart';
 import 'library_screen.dart';
 import 'marks.dart';
+import 'media_card.dart';
 
 /// Keys of books being downloaded, shared by Discover and the info page.
 final downloadingBooks = ValueNotifier<Set<String>>(const {});
@@ -31,11 +32,13 @@ Future<Book?> downloadFreeBook(BuildContext context, BookInfo b) async {
     final f = File(p.join(dir.path, '${b.key.replaceAll(':', '_')}.epub'));
     await f.writeAsBytes(bytes);
     final book = await Library.i.importFile(f.path, displayName: '${b.title}.epub');
+    book.sourceKey = b.key;
     // What you already said about it comes along.
     final mark = Library.i.savedOr(savedFrom(b));
     if (book.rating == 0) book.rating = mark.mark.rating;
     if (mark.mark.favorite) book.favorite = true;
     if (mark.folderIds.isNotEmpty) book.folderIds = {...book.folderIds, ...mark.folderIds}.toList();
+    Library.i.touch(book);
     if (b.coverUrl != null && book.coverPath == null) {
       await Library.i.enrich(book, onlyMissing: true, choice: BookInfo(title: book.title, author: b.author, coverUrl: b.coverUrl, subjects: b.subjects, description: b.description));
     }
@@ -62,6 +65,11 @@ Future<void> showBookMarks(BuildContext context, BookInfo b) {
             Text(b.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
             const SizedBox(height: 14),
             MarksBar(mark: s.mark, title: b.title, changed: () => Library.i.savedChanged(s), folders: () => s.folderIds, onFolder: (id) => Library.i.toggleSavedFolder(s, id)),
+            const SizedBox(height: 16),
+            PrimaryButton('Share card', ghost: true, icon: Icons.ios_share_sharp, expand: true, onTap: () {
+              Navigator.pop(ctx);
+              showMediaCard(context, ShareItem.catalogue(b, s.mark));
+            }),
           ]),
         );
       },
@@ -112,7 +120,10 @@ class BookInfoScreen extends StatefulWidget {
 
 class _BookInfoScreenState extends State<BookInfoScreen> {
   BookInfo get _b => widget.info;
-  late final Future<BookInfo?> _more = _fetchMore();
+  late final Future<BookInfo?> _more = _fetchMore().then((m) => _found = m);
+
+  /// What [_more] turned up, once it has, for the share card.
+  BookInfo? _found;
 
   /// Fills in what the search result left out: description, publisher, pages.
   Future<BookInfo?> _fetchMore() async {
@@ -123,15 +134,9 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
     return Metadata.best(_b.title, _b.author.split(',').first.trim(), isbn: _b.isbn);
   }
 
-  String? get _webUrl {
-    final k = _b.key;
-    if (k.startsWith('gutenberg:')) return 'https://www.gutenberg.org/ebooks/${k.substring(10)}';
-    if (k.startsWith('/')) return 'https://openlibrary.org$k';
-    if (_b.source == 'Google Books' && k.isNotEmpty) return 'https://books.google.com/books?id=$k';
-    return null;
-  }
+  String? get _webUrl => _b.webUrl;
 
-  Book? get _owned => Library.i.books.where((x) => x.title.toLowerCase() == _b.title.toLowerCase()).firstOrNull;
+  Book? get _owned => Library.i.copyOf(_b);
 
   @override
   Widget build(BuildContext context) {
@@ -143,6 +148,7 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
         backgroundColor: Colors.transparent,
         title: AppTitle(_b.source.isEmpty ? 'Book' : _b.source),
         actions: [
+          IconButton(tooltip: 'Share card', onPressed: () => showMediaCard(context, ShareItem.catalogue(_b, Library.i.savedOr(savedFrom(_b)).mark, more: _found)), icon: const Icon(Icons.ios_share_sharp)),
           if (_webUrl != null) IconButton(tooltip: 'Open on the web', onPressed: () => launchUrlString(_webUrl!, mode: LaunchMode.externalApplication), icon: const Icon(Icons.open_in_new_sharp)),
         ],
       ),

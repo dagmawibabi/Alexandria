@@ -5,7 +5,7 @@ import '../core/theme.dart';
 import '../core/ui.dart';
 import 'book_info_screen.dart';
 import 'folders_screen.dart';
-import 'library_screen.dart' show importBooks;
+import 'library_screen.dart' show importBooks, openBook;
 import '../services/api_cache.dart';
 import '../services/folders.dart';
 import '../services/library.dart';
@@ -222,6 +222,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                   itemBuilder: (_, i) {
                     final b = _results![i];
                     final isSaved = Library.i.isSaved(b.key);
+                    final owned = Library.i.copyOf(b);
                     return GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => openBookInfo(context, b),
@@ -243,7 +244,9 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                             const SizedBox(height: 10),
                             // Wraps on narrow screens rather than overflowing.
                             Wrap(spacing: 8, runSpacing: 8, children: [
-                              if (b.downloadUrl != null)
+                              if (owned != null)
+                                ToolButton(Icons.menu_book_sharp, label: 'Read', active: true, size: 34, onTap: () => openBook(context, owned))
+                              else if (b.downloadUrl != null)
                                 ToolButton(
                                   downloading.contains(b.key) ? Icons.hourglass_top_sharp : Icons.download_sharp,
                                   label: downloading.contains(b.key) ? 'Fetching' : 'Get EPUB',

@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:ui' as ui;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/rendering.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
@@ -16,6 +17,7 @@ import '../models/audiobook.dart';
 import '../models/book.dart';
 import '../models/podcast.dart';
 import '../models/radio.dart';
+import '../services/metadata.dart';
 import 'quote_card.dart';
 
 /// What a share card shows, whatever it is about.
@@ -68,6 +70,24 @@ class ShareItem {
         progress: b.progress,
         rating: b.rating,
       );
+
+  /// A book from the catalogues, which you may not own. [more] fills in what the listing left out.
+  factory ShareItem.catalogue(BookInfo b, UserMark mark, {BookInfo? more}) {
+    final year = b.year.isNotEmpty ? b.year : more?.year ?? '';
+    final pages = b.pageCount > 0 ? b.pageCount : more?.pageCount ?? 0;
+    return ShareItem(
+      kind: 'Book',
+      title: b.title,
+      subtitle: b.author,
+      detail: [year, if (pages > 0) '$pages pages'].where((s) => s.isNotEmpty).join(' · '),
+      about: b.description.isNotEmpty ? b.description : more?.description ?? '',
+      coverUrl: b.coverUrl,
+      tallCover: true,
+      rating: mark.rating,
+      note: mark.notes.firstOrNull?.text ?? '',
+      link: b.webUrl,
+    );
+  }
 
   factory ShareItem.audiobook(Audiobook b) => ShareItem(
         kind: 'Audiobook',
@@ -161,6 +181,28 @@ class _MediaStudioState extends State<MediaStudio> {
   /// Artwork size, as a share of the card's width.
   late double _artSize = widget.item.tallCover ? .42 : .5;
 
+  /// A picture of your own in place of the artwork, and its width over its height.
+  String? _image;
+  double _imageRatio = 1;
+
+  Future<void> _pickImage() async {
+    final files = await FilePicker.pickFiles(type: FileType.image);
+    final path = files.firstOrNull?.path;
+    if (path == null) return;
+    try {
+      final decoded = await decodeImageFromList(await File(path).readAsBytes());
+      final ratio = decoded.width / decoded.height;
+      decoded.dispose();
+      if (!mounted) return;
+      setState(() {
+        _image = path;
+        _imageRatio = ratio;
+      });
+    } catch (_) {
+      if (mounted) toast(context, 'Couldn’t read that image');
+    }
+  }
+
   Future<void> _share() async {
     setState(() => _sharing = true);
     try {
@@ -200,7 +242,7 @@ class _MediaStudioState extends State<MediaStudio> {
               aspectRatio: _aspect,
               child: RepaintBoundary(
                 key: _key,
-                child: _MediaCard(item: i, style: st, brand: _brand, about: _about, progress: _progress, rating: _rating, note: _note, artSize: _artSize, accent: Settings.i.signalOn(st.fg)),
+                child: _MediaCard(item: i, style: st, brand: _brand, about: _about, progress: _progress, rating: _rating, note: _note, artSize: _artSize, image: _image, imageRatio: _imageRatio, accent: Settings.i.signalOn(st.fg)),
               ),
             ),
           ),
@@ -231,6 +273,14 @@ class _MediaStudioState extends State<MediaStudio> {
         ),
         const SizedBox(height: 16),
         CardColorPicker(value: Settings.i.cardBg, onChanged: (c) => setState(() => Settings.i.cardBg = c)),
+        const SizedBox(height: 16),
+        Row(children: [
+          Expanded(child: PrimaryButton(_image == null ? 'Use my image' : 'Change image', ghost: true, icon: Icons.add_photo_alternate_outlined, expand: true, onTap: _pickImage)),
+          if (_image != null) ...[
+            const SizedBox(width: 10),
+            ToolButton(Icons.close_sharp, size: 48, tooltip: 'Back to the original image', onTap: () => setState(() => _image = null)),
+          ],
+        ]),
         SliderRow(label: 'Image size', value: _artSize, min: .2, max: .86, format: (v) => '${(v * 100).round()}%', onChanged: (v) => setState(() => _artSize = v)),
         const SizedBox(height: 8),
         const Label('Format'),
@@ -255,7 +305,7 @@ class _MediaStudioState extends State<MediaStudio> {
 }
 
 class _MediaCard extends StatelessWidget {
-  const _MediaCard({required this.item, required this.style, required this.brand, required this.about, required this.progress, required this.rating, required this.note, required this.artSize, required this.accent});
+  const _MediaCard({required this.item, required this.style, required this.brand, required this.about, required this.progress, required this.rating, required this.note, required this.artSize, this.image, this.imageRatio = 1, required this.accent});
   final ShareItem item;
   final CardStyle style;
   final bool brand;
@@ -264,12 +314,16 @@ class _MediaCard extends StatelessWidget {
   final bool rating;
   final bool note;
   final double artSize;
+
+  /// Your own picture, shown at its own shape (within reason) in place of the artwork.
+  final String? image;
+  final double imageRatio;
   final Color accent;
 
   @override
   Widget build(BuildContext context) {
     final i = item;
-    final local = i.coverPath != null && File(i.coverPath!).existsSync() ? i.coverPath : null;
+    final local = image ?? (i.coverPath != null && File(i.coverPath!).existsSync() ? i.coverPath : null);
     Widget? art() {
       if (local != null) return monoImage(Image.file(File(local), fit: BoxFit.cover, gaplessPlayback: true));
       if (i.coverUrl != null) return NetImage(i.coverUrl!, fallback: Container(color: style.fg.withValues(alpha: .08)));
@@ -311,7 +365,7 @@ class _MediaCard extends StatelessWidget {
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Container(
                           width: artW,
-                          height: i.tallCover ? artW * 1.5 : artW,
+                          height: image != null ? artW / imageRatio.clamp(.5, 2) : (i.tallCover ? artW * 1.5 : artW),
                           clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
                             color: style.fg.withValues(alpha: .1),

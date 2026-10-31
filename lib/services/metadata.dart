@@ -36,6 +36,14 @@ class BookInfo {
 
   /// A free EPUB (Project Gutenberg) when known.
   final String? downloadUrl;
+
+  /// Its page on the catalogue it came from.
+  String? get webUrl {
+    if (key.startsWith('gutenberg:')) return 'https://www.gutenberg.org/ebooks/${key.substring(10)}';
+    if (key.startsWith('/')) return 'https://openlibrary.org$key';
+    if (source == 'Google Books' && key.isNotEmpty) return 'https://books.google.com/books?id=$key';
+    return null;
+  }
 }
 
 const _ua = {'User-Agent': 'Alexandria-Reader/1.0 (personal ebook reader)'};
