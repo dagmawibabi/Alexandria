@@ -38,7 +38,7 @@ class _UsageSectionState extends State<UsageSection> {
     super.initState();
     if (Ai.omni.elevenLabs.isConfigured) _eleven = Ai.omni.elevenLabs.subscription();
     // The list prices used for estimates.
-    Ai.omni.catalog.load().catchError((_) {});
+    Ai.loadCatalog().catchError((_) {});
   }
 
   DateTime? get _from {

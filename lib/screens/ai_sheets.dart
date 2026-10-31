@@ -155,53 +155,72 @@ Widget _modelRow(BuildContext ctx, String id, String name, VoidCallback changed)
 }
 
 Future<void> _catalog(BuildContext context) async {
-  final loading = Ai.omni.catalog.load();
-  await showSheet(context, scroll: false, builder: (ctx) {
-    final t = Tokens.of(ctx);
-    var q = '';
+  await showSheet(context, scroll: false, builder: (_) => const _CatalogSheet());
+}
+
+class _CatalogSheet extends StatefulWidget {
+  const _CatalogSheet();
+
+  @override
+  State<_CatalogSheet> createState() => _CatalogSheetState();
+}
+
+// The search lives in State: showSheet's builder runs again whenever the keyboard
+// opens or closes, which would lose anything kept there and reshuffle the list.
+class _CatalogSheetState extends State<_CatalogSheet> {
+  final _loading = Ai.loadCatalog();
+  var _q = '';
+
+  String get _emptyText {
+    if (!Ai.configured) return 'Add a key to see models';
+    if (_q.trim().isNotEmpty) return 'No models match';
+    return 'Could not load models. Check your key and connection.';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
     return FutureBuilder(
-      future: loading,
+      future: _loading,
       builder: (ctx, snap) {
         if (snap.connectionState != ConnectionState.done) {
           return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5)));
         }
-        return StatefulBuilder(builder: (ctx, setS) {
-          final models = Ai.omni.catalog
-              .search(q, type: ModelType.text)
-              .where((m) => (m.provider == 'google' && Ai.omni.google.isConfigured) || (m.provider == 'gateway' && Ai.omni.gateway.isConfigured))
-              .take(120)
-              .toList();
-          return Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
-            child: Column(children: [
-              SearchBox(historyKey: 'ai-models', decoration: const InputDecoration(hintText: 'Search models', prefixIcon: Icon(Icons.search_sharp, size: 18)), onChanged: (v) => setS(() => q = v)),
-              const SizedBox(height: 10),
-              if (models.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Label('Add a key to see models')),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: models.length,
-                  itemBuilder: (_, i) {
-                    final m = models[i];
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(m.name, style: TextStyle(color: t.ink, fontWeight: Settings.i.aiModel == m.id ? FontWeight.w700 : FontWeight.w500)),
-                      subtitle: Text(m.id, style: mono(ctx, size: 10, spacing: 0)),
-                      trailing: Settings.i.aiModel == m.id ? Icon(Icons.check_sharp, color: t.accent) : null,
-                      onTap: () {
-                        Settings.i.aiModel = m.id;
-                        Navigator.pop(ctx);
-                      },
-                    );
-                  },
-                ),
+        final models = Ai.omni.catalog
+            .search(_q, type: ModelType.text)
+            .where((m) => (m.provider == 'google' && Ai.omni.google.isConfigured) || (m.provider == 'gateway' && Ai.omni.gateway.isConfigured))
+            .take(120)
+            .toList();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+          child: Column(children: [
+            SearchBox(historyKey: 'ai-models', decoration: const InputDecoration(hintText: 'Search models', prefixIcon: Icon(Icons.search_sharp, size: 18)), onChanged: (v) => setState(() => _q = v)),
+            const SizedBox(height: 10),
+            if (models.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Label(_emptyText)),
+            Expanded(
+              child: ListView.builder(
+                itemCount: models.length,
+                itemBuilder: (_, i) {
+                  final m = models[i];
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(m.name, style: TextStyle(color: t.ink, fontWeight: Settings.i.aiModel == m.id ? FontWeight.w700 : FontWeight.w500)),
+                    subtitle: Text(m.id, style: mono(ctx, size: 10, spacing: 0)),
+                    trailing: Settings.i.aiModel == m.id ? Icon(Icons.check_sharp, color: t.accent) : null,
+                    onTap: () {
+                      Settings.i.aiModel = m.id;
+                      Navigator.pop(ctx);
+                    },
+                  );
+                },
               ),
-            ]),
-          );
-        });
+            ),
+          ]),
+        );
       },
     );
-  });
+  }
 }
 
 /// A sheet that streams one AI answer, with optional mode switching.

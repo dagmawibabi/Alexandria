@@ -609,10 +609,10 @@ packages:
     dependency: "direct main"
     description:
       name: omni_ai
-      sha256: "133b0feed4d20a782cd996fc8b398cc5a47a445248802780bc8761480441eec1"
+      sha256: e5ceca201109bbbe7282bbe00a07e0c80f4c9c3b0b5905294e25c4a85f34c5bd
       url: "https://pub.dev"
     source: hosted
-    version: "0.6.0"
+    version: "0.6.1"
   package_config:
     dependency: transitive
     description:

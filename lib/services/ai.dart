@@ -26,6 +26,16 @@ class Ai {
 
   static bool get configured => omni.google.isConfigured || omni.gateway.isConfigured;
 
+  /// Loads the model catalog, fetching again if a connected provider is missing
+  /// from it. The gateway lists its models without a key, so a copy saved before
+  /// a key was added looks fresh for days with nothing from that provider.
+  static Future<void> loadCatalog() async {
+    await ready;
+    final catalog = omni.catalog;
+    await catalog.load();
+    if (providers.any((id) => omni.provider(id).isConfigured && catalog.ofProvider(id).isEmpty)) await catalog.refresh();
+  }
+
   /// The chosen model, falling back to whichever provider has a key.
   static String get model {
     final m = Settings.i.aiModel;
