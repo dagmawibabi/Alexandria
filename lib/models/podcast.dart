@@ -31,6 +31,12 @@ class Episode {
 
   String? get art => imageUrl ?? podcastImage;
 
+  /// Whether every word of [query] appears in the title or show notes.
+  bool matches(String query) {
+    final text = '$title\n$description'.toLowerCase();
+    return query.toLowerCase().split(RegExp(r'\s+')).every(text.contains);
+  }
+
   Map<String, dynamic> toJson() => {
         'guid': guid,
         'feedUrl': feedUrl,

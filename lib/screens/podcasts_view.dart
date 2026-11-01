@@ -509,9 +509,17 @@ class _PodcastScreenState extends State<PodcastScreen> {
   /// 'all', or an episode stage: 'unplayed', 'started', 'played'.
   String _filter = 'all';
 
+  final _search = TextEditingController();
+
   Future<Podcast?> _load() {
     Podcasts.i.unreachable = false;
     return Podcasts.i.feed(widget.feedUrl, refresh: true);
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
   }
 
   @override
@@ -545,7 +553,8 @@ class _PodcastScreenState extends State<PodcastScreen> {
             builder: (context, _) {
               final subbed = Podcasts.i.subscribed(pod.feedUrl);
               final sorted = _oldest ? pod.episodes.reversed.toList() : pod.episodes;
-              final eps = _filter == 'all' ? sorted : sorted.where((e) => Podcasts.i.stage(e) == _filter).toList();
+              final query = _search.text.trim();
+              final eps = sorted.where((e) => (_filter == 'all' || Podcasts.i.stage(e) == _filter) && (query.isEmpty || e.matches(query))).toList();
               int count(String stage) => pod.episodes.where((e) => Podcasts.i.stage(e) == stage).length;
               return RefreshIndicator(
                 onRefresh: () => ApiCache.fresh(() async {
@@ -593,10 +602,23 @@ class _PodcastScreenState extends State<PodcastScreen> {
                       ],
                       SectionHeader(
                         '',
-                        'Episodes',
+                        query.isEmpty ? 'Episodes' : 'Episodes · ${eps.length} found',
                         padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
                         trailing: Tag(_oldest ? 'Oldest first' : 'Newest first', onTap: () => setState(() => _oldest = !_oldest)),
                       ),
+                      if (pod.episodes.isNotEmpty) ...[
+                        SearchBox(
+                          historyKey: 'show-episodes',
+                          controller: _search,
+                          onChanged: (_) => setState(() {}),
+                          decoration: InputDecoration(
+                            hintText: 'Search this show',
+                            prefixIcon: const Icon(Icons.search_sharp, size: 18),
+                            suffixIcon: _search.text.isEmpty ? null : IconButton(tooltip: 'Clear', icon: const Icon(Icons.close_sharp, size: 18), onPressed: () => setState(_search.clear)),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
                       SizedBox(
                         height: 36,
                         child: ListView(scrollDirection: Axis.horizontal, children: [
@@ -604,7 +626,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                             Padding(padding: const EdgeInsets.only(right: 6), child: Tag('$name · $n', filled: _filter == id, onTap: () => setState(() => _filter = id))),
                         ]),
                       ),
-                      if (eps.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text('No episodes in this view.', style: TextStyle(color: t.muted)))),
+                      if (eps.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(query.isEmpty ? 'No episodes in this view.' : 'No episodes match “$query”.', textAlign: TextAlign.center, style: TextStyle(color: t.muted)))),
                     ]),
                   ),
                 ),
