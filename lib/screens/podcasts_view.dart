@@ -566,6 +566,9 @@ class _PodcastScreenState extends State<PodcastScreen> {
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      // The show's details step aside during a search, so the results
+                      // sit right under the box instead of behind the keyboard.
+                      if (query.isEmpty) ...[
                       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         SizedBox(width: 120, child: PodcastArt(pod.imageUrl ?? widget.hit?.artwork, title: pod.title)),
                         const SizedBox(width: 16),
@@ -600,25 +603,26 @@ class _PodcastScreenState extends State<PodcastScreen> {
                         const SizedBox(height: 12),
                         Wrap(spacing: 6, runSpacing: 6, children: [for (final c in pod.categories.take(6)) Tag(c)]),
                       ],
+                      ],
                       SectionHeader(
                         '',
-                        query.isEmpty ? 'Episodes' : 'Episodes · ${eps.length} found',
+                        query.isEmpty ? 'Episodes' : '${eps.length} found',
                         padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
                         trailing: Tag(_oldest ? 'Oldest first' : 'Newest first', onTap: () => setState(() => _oldest = !_oldest)),
                       ),
-                      if (pod.episodes.isNotEmpty) ...[
-                        SearchBox(
-                          historyKey: 'show-episodes',
-                          controller: _search,
-                          onChanged: (_) => setState(() {}),
-                          decoration: InputDecoration(
-                            hintText: 'Search this show',
-                            prefixIcon: const Icon(Icons.search_sharp, size: 18),
-                            suffixIcon: _search.text.isEmpty ? null : IconButton(tooltip: 'Clear', icon: const Icon(Icons.close_sharp, size: 18), onPressed: () => setState(_search.clear)),
-                          ),
+                      // Keyed so it keeps focus when the details above it go away.
+                      SearchBox(
+                        key: const ValueKey('show-search'),
+                        historyKey: 'show-episodes',
+                        controller: _search,
+                        onChanged: (_) => setState(() {}),
+                        decoration: InputDecoration(
+                          hintText: 'Search this show',
+                          prefixIcon: const Icon(Icons.search_sharp, size: 18),
+                          suffixIcon: _search.text.isEmpty ? null : IconButton(tooltip: 'Clear', icon: const Icon(Icons.close_sharp, size: 18), onPressed: () => setState(_search.clear)),
                         ),
-                        const SizedBox(height: 10),
-                      ],
+                      ),
+                      const SizedBox(height: 10),
                       SizedBox(
                         height: 36,
                         child: ListView(scrollDirection: Axis.horizontal, children: [

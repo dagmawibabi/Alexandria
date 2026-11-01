@@ -48,6 +48,59 @@ void main() {
     await Storage.init();
   });
 
+  testWidgets('the box sits just above the filters, and results come right under it', (tester) async {
+    tester.view
+      ..physicalSize = const Size(393, 780)
+      ..devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    const url = 'https://example.test/long';
+    Podcasts.i.subscribe(Podcast(
+      feedUrl: url,
+      title: 'Long Show',
+      author: 'Someone',
+      description: 'A long description of this show. ' * 30,
+      categories: const ['History', 'Society', 'Culture'],
+      episodes: [for (var i = 0; i < 20; i++) episode('Episode $i')],
+    ));
+
+    await tester.pumpWidget(MaterialApp(theme: buildTheme(Brightness.light, Settings.i), home: const PodcastScreen(feedUrl: url)));
+    for (var i = 0; i < 5; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    tester.takeException();
+
+    final box = find.byType(TextField);
+    final filters = find.textContaining(RegExp(r'all · 20', caseSensitive: false));
+    expect(tester.getRect(box).bottom, lessThan(tester.getTopLeft(filters).dy), reason: 'above the filters');
+    expect(tester.getTopLeft(find.textContaining(RegExp('subscribed', caseSensitive: false))).dy, lessThan(tester.getTopLeft(box).dy), reason: 'below the show details');
+
+    // The details going away mustn't drop the field, or the keyboard would close.
+    await tester.showKeyboard(box);
+    await tester.enterText(box, 'E');
+    await tester.pump();
+    expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue, reason: 'keeps focus when the details hide');
+
+    await tester.enterText(box, 'Episode 7');
+    await tester.pump();
+    expect(tester.takeException(), isNull, reason: 'nothing overflows while searching');
+    expect(tester.widget<EditableText>(find.byType(EditableText)).focusNode.hasFocus, isTrue);
+    final row = find.text('Episode 7');
+    expect(find.descendant(of: find.byType(EpisodeRow), matching: row), findsWidgets);
+    expect(find.text('Episode 8'), findsNothing);
+    expect(tester.getTopLeft(find.byType(EpisodeRow).first).dy, lessThan(780 - 300 - 60), reason: 'above where the keyboard opens');
+    expect(find.text('Subscribed'), findsNothing, reason: 'show details step aside');
+
+    await tester.tap(find.byTooltip('Clear'));
+    await tester.pump();
+    expect(find.textContaining(RegExp('subscribed', caseSensitive: false)), findsOneWidget);
+
+    Podcasts.i.unsubscribe(url);
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 5));
+    tester.takeException();
+  });
+
   testWidgets('searching a show narrows its episodes and clearing brings them back', (tester) async {
     tester.view
       ..physicalSize = const Size(412, 1600)

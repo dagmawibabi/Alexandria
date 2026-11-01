@@ -122,7 +122,9 @@ void main() {
 
     test('what was just added comes first until it is opened', () async {
       final older = Book(id: 'older', title: 'A', format: BookFormat.epub, path: '', addedAt: DateTime(2020));
-      final book = await add(amharicEpub('$spaced አዲስ'), 'new.epub');
+      // Built once: a zip stamps the time, so a second build can be a different file.
+      final bytes = amharicEpub('$spaced አዲስ');
+      final book = await add(bytes, 'new.epub');
       expect(Library.i.newFirst([older, book]).first, book);
 
       book.lastOpenedAt = DateTime.now().add(const Duration(minutes: 1));
@@ -130,7 +132,7 @@ void main() {
 
       // Added again: a copy already here counts as just added too.
       book.lastOpenedAt = DateTime.now().subtract(const Duration(minutes: 1));
-      await add(amharicEpub('$spaced አዲስ'), 'new.epub');
+      expect(identical(await add(bytes, 'new.epub'), book), isTrue);
       expect(Library.i.newFirst([older, book]).first, book);
     });
   });
