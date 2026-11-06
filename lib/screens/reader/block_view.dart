@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -9,6 +8,7 @@ import '../../core/theme.dart';
 import '../../core/ui.dart';
 import '../../models/annotations.dart';
 import '../../models/doc.dart';
+import '../../core/image_viewer.dart';
 
 enum SelAction { highlight, unmark, bookmark, note, explain, define, quote, copy, find, speak }
 
@@ -170,16 +170,8 @@ class BlockView extends StatelessWidget {
     );
   }
 
-  void _viewImage(BuildContext context, String path) {
-    Navigator.of(context).push(PageRouteBuilder(
-      opaque: false,
-      barrierColor: Colors.black87,
-      pageBuilder: (ctx, _, _) => GestureDetector(
-        onTap: () => Navigator.pop(ctx),
-        child: InteractiveViewer(maxScale: 6, child: Center(child: Image.file(File(path)))),
-      ),
-    ));
-  }
+  void _viewImage(BuildContext context, String path) => openImageViewer(context, path: path, title: 'Picture');
+
 }
 
 /// The industrial selection toolbar: highlight colours + actions.

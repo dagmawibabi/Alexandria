@@ -5,6 +5,7 @@ import '../core/search_box.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../services/metadata.dart';
+import '../core/skeleton.dart';
 
 /// Searches Google Books and Open Library with a query the user can edit,
 /// and returns the chosen record (with its description filled in when possible).
@@ -83,7 +84,7 @@ class _MetaSearchState extends State<_MetaSearch> {
         const SizedBox(height: 10),
         Expanded(
           child: _loading
-              ? const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5)))
+              ? ListView(physics: const NeverScrollableScrollPhysics(), children: const [SkeletonRows(count: 6, art: 44, artAspect: 2 / 3, lines: 3)])
               : results.isEmpty
                   ? Center(child: Text('No matches. Try fewer words, or just the title.', style: TextStyle(color: t.muted)))
                   : ListView.builder(

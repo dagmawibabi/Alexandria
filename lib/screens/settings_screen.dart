@@ -11,6 +11,7 @@ import '../core/color_picker.dart';
 import '../core/settings.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
+import '../models/podcast.dart';
 import '../services/ai.dart';
 import '../services/backup.dart';
 import '../services/podcasts.dart';
@@ -48,8 +49,16 @@ class SettingsScreen extends StatelessWidget {
             _Row(Icons.swipe_sharp, 'Motion & gestures', 'Auto-scroll, swipe cards, tap zones', () => _open(context, 'Motion & gestures', const MotionControls(showListen: false))),
             const _Group('Listening'),
             _Row(Icons.record_voice_over_outlined, 'Read-aloud voice', Speech.summary, () => _open(context, 'Read-aloud voice', const ListenPanel())),
-            _Row(Icons.open_in_full_sharp, 'Player', s.openPlayerOnPlay ? 'Opens full screen when you press play' : 'Stays in the mini player', () => _open(context, 'Player', const _Player())),
-            _Row(Icons.podcasts_sharp, 'New-episode alerts', s.podcastAlerts ? 'Every ${s.podcastCheckHours} hours' : 'Off', () => _open(context, 'New-episode alerts', const _PodcastAlerts())),
+            _Row(
+              Icons.podcasts_sharp,
+              'Player & podcasts',
+              [
+                s.openPlayerOnPlay ? 'Full player on play' : 'Mini player',
+                EpisodeSort.parse(s.episodeSort).label,
+                s.podcastAlerts ? 'Alerts every ${s.podcastCheckHours} h' : 'Alerts off',
+              ].join(' · '),
+              () => _open(context, 'Player & podcasts', const _PlayerAndPodcasts()),
+            ),
             const _Group('Assistant'),
             _Row(Icons.auto_awesome_outlined, 'AI companion', Ai.configured ? Ai.model : 'Not connected', () => _open(context, 'AI companion', const _AiPage())),
             const _Group('Your data'),
@@ -211,6 +220,24 @@ class _Library extends StatelessWidget {
   }
 }
 
+/// The player, episode order and new-episode alerts, on one page.
+class _PlayerAndPodcasts extends StatelessWidget {
+  const _PlayerAndPodcasts();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget heading(String title, {bool first = false}) => Padding(padding: EdgeInsets.fromLTRB(2, first ? 4 : 28, 0, 10), child: Label(title, color: Tokens.of(context).muted, weight: FontWeight.w600));
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      heading('Player', first: true),
+      const _Player(),
+      heading('Episode order'),
+      const _EpisodeOrder(),
+      heading('New-episode alerts'),
+      const _PodcastAlerts(),
+    ]);
+  }
+}
+
 class _Player extends StatelessWidget {
   const _Player();
 
@@ -224,6 +251,44 @@ class _Player extends StatelessWidget {
         value: Settings.i.openPlayerOnPlay,
         onChanged: (v) => Settings.i.openPlayerOnPlay = v,
       ),
+    );
+  }
+}
+
+/// The default order of a show's episodes, and resetting shows to it.
+class _EpisodeOrder extends StatelessWidget {
+  const _EpisodeOrder();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([Settings.i, Podcasts.i]),
+      builder: (context, _) {
+        final t = Tokens.of(context);
+        final s = Settings.i;
+        final own = Podcasts.i.showSorts.length;
+        final current = EpisodeSort.parse(s.episodeSort);
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('How a show’s episodes are listed. A show you set an order on yourself, from the chip above its episodes, keeps its own.', style: TextStyle(color: t.muted, height: 1.4)),
+          const SizedBox(height: 14),
+          Segmented<EpisodeSort>(values: EpisodeSort.values, labels: [for (final v in EpisodeSort.values) v.short], value: current, onChanged: (v) => s.episodeSort = v.name),
+          const SizedBox(height: 22),
+          Panel(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Apply to every show', style: TextStyle(fontSize: 16.5, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 3),
+              Text(own == 0 ? 'Every show already follows this order.' : '${own == 1 ? 'One show has' : '$own shows have'} an order of their own. This puts them back on “${current.label}”.', style: TextStyle(color: t.muted, fontSize: 13.5, height: 1.3)),
+              if (own > 0) ...[
+                const SizedBox(height: 12),
+                PrimaryButton('Apply to all shows', icon: Icons.done_all_sharp, onTap: () async {
+                  if (await confirm(context, 'Apply to all shows', 'Every show will list its episodes ${current.label.toLowerCase()}. Shows you ordered yourself lose that choice.')) Podcasts.i.clearSorts();
+                }),
+              ],
+            ]),
+          ),
+        ]);
+      },
     );
   }
 }

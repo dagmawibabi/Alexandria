@@ -17,6 +17,7 @@ import 'player_screen.dart';
 import 'downloads_screen.dart';
 import 'media_card.dart';
 import 'recently_added.dart';
+import '../core/skeleton.dart';
 
 class AudiobooksScreen extends StatefulWidget {
   const AudiobooksScreen({super.key});
@@ -242,7 +243,7 @@ class _AudiobooksScreenState extends State<AudiobooksScreen> {
       ),
       SliverToBoxAdapter(child: SectionHeader('', _q.text.isEmpty ? 'Browse' : 'Results · ${results.length}', padding: const EdgeInsets.fromLTRB(20, 20, 20, 8))),
       if (_loading)
-        const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5))))
+        const SliverToBoxAdapter(child: SkeletonRows(count: 6, art: 64, lines: 3, padding: EdgeInsets.symmetric(horizontal: 20)))
       else if (results.isEmpty)
         SliverToBoxAdapter(
           child: Padding(
@@ -471,7 +472,7 @@ class _FreeAudiobookScreenState extends State<FreeAudiobookScreen> {
                           ? PrimaryButton('Downloading ${(dl * 100).round()}%', ghost: true, icon: Icons.close_sharp, onTap: () => Downloads.i.cancel(b!.id))
                           : (b != null && b.offline
                               ? PrimaryButton('Downloaded', ghost: true, icon: Icons.download_done_sharp, onTap: null)
-                              : PrimaryButton('Download', ghost: true, icon: Icons.download_sharp, onTap: tracks.isEmpty ? null : _download)),
+                              : PrimaryButton('Download all', ghost: true, icon: Icons.download_sharp, onTap: tracks.isEmpty ? null : _download)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -502,7 +503,7 @@ class _FreeAudiobookScreenState extends State<FreeAudiobookScreen> {
             ],
             const SectionHeader('02', 'Chapters', padding: EdgeInsets.fromLTRB(0, 26, 0, 6)),
             if (snap.connectionState != ConnectionState.done)
-              const Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5)))
+              const SkeletonRows(count: 6, art: null, lines: 2)
             else if (tracks.isEmpty)
               Row(children: [
                 Expanded(child: Text(FreeAudio.unreachable ? 'Couldn’t load the chapters. Check your connection.' : 'This item has no playable audio files.', style: TextStyle(color: t.muted))),

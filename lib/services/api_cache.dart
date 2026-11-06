@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
@@ -42,9 +43,9 @@ class ApiCache {
     var answered = false;
     for (var attempt = 0; attempt < attempts && !answered; attempt++) {
       try {
-        final r = await http.get(Uri.parse(url), headers: headers).timeout(timeout);
+        final r = await _fetch(url, headers, timeout);
         if (r.statusCode == 200) {
-          final body = utf8.decode(r.bodyBytes, allowMalformed: true);
+          final body = utf8.decode(r.bytes, allowMalformed: true);
           await _store(f, body);
           return body;
         }
@@ -63,6 +64,25 @@ class ApiCache {
     }
     if (!answered) onUnreachable?.call();
     return null;
+  }
+
+  /// [timeout] is how long the server may go quiet (before answering, or
+  /// between chunks), not a cap on the whole download: a long-running show's
+  /// feed can be 20 MB and take far longer than that on a slow connection.
+  static Future<({int statusCode, List<int> bytes})> _fetch(String url, Map<String, String>? headers, Duration timeout) async {
+    final client = http.Client();
+    try {
+      final req = http.Request('GET', Uri.parse(url));
+      if (headers != null) req.headers.addAll(headers);
+      final res = await client.send(req).timeout(timeout);
+      final bytes = BytesBuilder(copy: false);
+      await for (final chunk in res.stream.timeout(timeout)) {
+        bytes.add(chunk);
+      }
+      return (statusCode: res.statusCode, bytes: bytes.takeBytes());
+    } finally {
+      client.close();
+    }
   }
 
   static Future<void> _store(File f, String body) async {

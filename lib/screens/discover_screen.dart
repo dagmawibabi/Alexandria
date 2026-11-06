@@ -11,6 +11,7 @@ import '../services/api_cache.dart';
 import '../services/folders.dart';
 import '../services/library.dart';
 import '../services/metadata.dart';
+import '../core/skeleton.dart';
 
 class DiscoverScreen extends StatefulWidget {
   const DiscoverScreen({super.key});
@@ -202,7 +203,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                 ),
               ),
             if (_loading)
-              const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5))))
+              const SliverToBoxAdapter(child: SkeletonRows(count: 6, art: 56, artAspect: 2 / 3, lines: 3, padding: EdgeInsets.symmetric(horizontal: 20)))
             else if ((_results ?? []).isEmpty)
               SliverToBoxAdapter(
                 child: Padding(

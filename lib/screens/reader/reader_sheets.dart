@@ -17,6 +17,7 @@ import '../../services/metadata.dart';
 import '../../services/speech.dart';
 import '../listen_sheet.dart';
 import '../quote_card.dart';
+import '../../core/skeleton.dart';
 
 // ======================= TYPE =======================
 
@@ -613,7 +614,7 @@ Future<void> showDefine(BuildContext context, String word, {VoidCallback? onAskA
             if (e != null && e.phonetic.isNotEmpty) Text(e.phonetic, style: mono(ctx, size: 13, spacing: 0)),
             const SizedBox(height: 14),
             if (snap.connectionState != ConnectionState.done)
-              const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5)))
+              const Padding(padding: EdgeInsets.only(top: 4), child: SkeletonText(lines: 3, paragraphs: 2))
             else if (e == null || e.isEmpty)
               Text('No dictionary entry found. Try AI for an in-context meaning.', style: TextStyle(color: t.muted))
             else ...[

@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:audioplayers/audioplayers.dart';
+import 'package:audio_session/audio_session.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 
@@ -338,12 +339,7 @@ class AudioLibrary extends ChangeNotifier {
     try {
       for (final t in todo) {
         try {
-          await probe.setSourceDeviceFile(t.path);
-          Duration? d;
-          for (var i = 0; i < 20 && (d == null || d == Duration.zero); i++) {
-            d = await probe.getDuration();
-            if (d == null || d == Duration.zero) await Future.delayed(const Duration(milliseconds: 150));
-          }
+          final d = await probe.setFilePath(t.path);
           if (d != null && d > Duration.zero) t.ms = d.inMilliseconds;
         } catch (_) {}
       }
@@ -355,51 +351,124 @@ class AudioLibrary extends ChangeNotifier {
 }
 
 /// Audiobook playback: one book at a time, remembering position per book.
+///
+/// Built on just_audio (ExoPlayer on Android), which starts a stream after a
+/// short buffer and seeks inside remote files with range requests. Android's
+/// MediaPlayer, used before, buffered far more before starting and crawled
+/// when resuming a podcast halfway through.
 class Player extends ChangeNotifier {
-  Player._() {
-    // The default updater runs on screen frames, which stop with the screen off:
-    // saved positions, stats and the notification all rely on this while locked.
-    _p.positionUpdater = TimerPositionUpdater(getPosition: _p.getCurrentPosition, interval: const Duration(milliseconds: 400));
-    _p.onPositionChanged.listen((d) {
-      final b = book;
-      if (b == null) return;
-      position = d;
-      b.positionMs = d.inMilliseconds;
-      _tickListening();
-      if (DateTime.now().difference(_lastSave).inSeconds >= 5) _save();
-      notifyListeners();
-    });
-    _p.onDurationChanged.listen((d) {
+  Player._();
+
+  static final Player i = Player._();
+
+  AudioPlayer? _player;
+
+  /// Made on first use, so nothing touches the platform until something plays.
+  AudioPlayer get _p => _player ??= _create();
+
+  AudioPlayer _create() {
+    final p = AudioPlayer();
+    // Spoken word: ducks under notifications, pauses for calls.
+    AudioSession.instance.then((s) => s.configure(const AudioSessionConfiguration.speech())).ignore();
+    p.durationStream.listen((d) {
+      if (d == null || _loadingSource) return;
       duration = d;
       final t = current;
-      if (t != null && d > Duration.zero && (t.ms - d.inMilliseconds).abs() > 1000) {
+      if (t != null && d > Duration.zero && book?.source != 'radio' && (t.ms - d.inMilliseconds).abs() > 1000) {
         t.ms = d.inMilliseconds;
         _save();
       }
       notifyListeners();
     });
-    _p.onPlayerStateChanged.listen((s) {
-      playing = s == PlayerState.playing;
-      if (!playing) {
-        _lastTick = null;
-        _logListening();
-        _save();
+    p.playerStateStream.listen((s) {
+      final done = s.processingState == ProcessingState.completed;
+      final was = playing;
+      playing = s.playing && !done;
+      _buffering = s.processingState == ProcessingState.loading || s.processingState == ProcessingState.buffering;
+      if (playing) {
+        _startTicker();
+      } else {
+        _stopTicker();
+        if (was) {
+          _lastTick = null;
+          _logListening();
+          _save();
+        }
       }
       notifyListeners();
+      if (done && _loaded && !_loadingSource && !_completedHandled) {
+        _completedHandled = true;
+        _ended();
+      }
+    }, onError: (_) {});
+    // A stream that drops mid-play; errors while opening are caught in _load.
+    p.errorStream.listen((e) {
+      final t = current;
+      if (t == null || _loadingSource) return;
+      error = t.remote ? 'Lost the stream. Check your connection and press play.' : 'Could not play this file.';
+      _loaded = false;
+      notifyListeners();
     });
-    _p.onPlayerComplete.listen((_) => _ended());
+    p.playbackEventStream.listen((_) {}, onError: (_) {});
+    return p;
   }
 
-  static final Player i = Player._();
+  // Position ticks from a timer, not screen frames, which stop with the screen
+  // off: saved positions, stats and the notification all rely on it while locked.
+  Timer? _ticker;
 
-  final AudioPlayer _p = AudioPlayer(playerId: 'alexandria-audiobooks');
+  void _startTicker() => _ticker ??= Timer.periodic(const Duration(milliseconds: 400), (_) => _tick());
+
+  void _stopTicker() {
+    if (_ticker == null) return;
+    _ticker!.cancel();
+    _ticker = null;
+    // One last read, so a pause lands on the exact spot.
+    _tick();
+  }
+
+  void _tick() {
+    final b = book;
+    if (b == null || !_loaded || _loadingSource) return;
+    final d = _p.position;
+    position = d;
+    b.positionMs = d.inMilliseconds;
+    _tickListening();
+    if (DateTime.now().difference(_lastSave).inSeconds >= 5) _save();
+    _ticks.ping();
+    // Everyone else hears about the position every couple of seconds: the
+    // pages listening here show percentages and minutes left, not seconds.
+    if (DateTime.now().difference(_lastNotified) >= const Duration(seconds: 2)) notifyListeners();
+  }
+
+  final _ticks = _Ticks();
+  DateTime _lastNotified = DateTime(0);
+
+  /// Fires on every position update (a few times a second) as well as on every
+  /// change the player itself announces. For what shows the exact playing
+  /// position: the seek bar, the mini player's progress line, read-along.
+  /// Listening to the player itself gets changes at once but the position only
+  /// every two seconds, which keeps whole pages from redrawing as it plays.
+  late final Listenable ticks = Listenable.merge([this, _ticks]);
+
+  @override
+  void notifyListeners() {
+    _lastNotified = DateTime.now();
+    super.notifyListeners();
+  }
+
+  bool _completedHandled = false;
+  bool _buffering = false;
+  bool _loadingSource = false;
 
   Audiobook? book;
   Duration position = Duration.zero;
   Duration duration = Duration.zero;
   bool playing = false;
-  bool loading = false;
   String? error;
+
+  /// Opening a source, or waiting on the network mid-play.
+  bool get loading => _loadingSource || (_buffering && _loaded);
 
   /// When the sleep timer stops playback, or null.
   DateTime? sleepAt;
@@ -442,7 +511,6 @@ class Player extends ChangeNotifier {
   }
 
   bool _loaded = false;
-  bool _contextSet = false;
   DateTime _lastSave = DateTime(0);
 
   AudioTrack? get current {
@@ -481,7 +549,7 @@ class Player extends ChangeNotifier {
     if (playing) await _p.stop();
     book = b;
     _loaded = false;
-    loading = false;
+    _loadingSource = false;
     playing = false;
     error = why;
     notifyListeners();
@@ -493,29 +561,37 @@ class Player extends ChangeNotifier {
     if (b == null || t == null) return;
     // Live radio always joins at now.
     if (b.source == 'radio') b.positionMs = 0;
-    loading = true;
+    _loadingSource = true;
+    _loaded = false;
+    _completedHandled = false;
     position = Duration(milliseconds: b.positionMs);
     duration = Duration(milliseconds: t.ms);
     notifyListeners();
     try {
-      if (!_contextSet) {
-        _contextSet = true;
-        // Keep playing with the screen off, as spoken word.
-        await _p.setAudioContext(AudioContext(
-          android: const AudioContextAndroid(stayAwake: true, contentType: AndroidContentType.speech, usageType: AndroidUsageType.media, audioFocus: AndroidAudioFocus.gain),
-        ));
-      }
-      await _p.setSource(t.remote ? UrlSource(t.path) : DeviceFileSource(t.path));
+      // A new source inherits "playing"; only start it when asked to.
+      if (!play && _p.playing) await _p.pause();
+      await _p.setSpeed(b.speed);
+      // Opening at the saved spot is one request; loading and then seeking was two.
+      final source = t.remote ? AudioSource.uri(Uri.parse(t.path)) : AudioSource.file(t.path);
+      final d = await _p.setAudioSource(source, initialPosition: b.positionMs > 0 ? Duration(milliseconds: b.positionMs) : null);
+      // Something else was opened while this one loaded.
+      if (!identical(book, b) || !identical(current, t)) return;
       _loaded = true;
-      await _p.setPlaybackRate(b.speed);
-      if (b.positionMs > 0) await _p.seek(Duration(milliseconds: b.positionMs));
-      if (play) await _p.resume();
+      error = null;
+      if (d != null && d > Duration.zero) {
+        duration = d;
+        if (b.source != 'radio' && (t.ms - d.inMilliseconds).abs() > 1000) t.ms = d.inMilliseconds;
+      }
+      // play() completes only when playback stops, so it isn't awaited.
+      if (play) _p.play().ignore();
     } catch (e) {
-      error = t.remote ? 'Could not stream this chapter. Check your connection.' : 'Could not play this file: $e';
+      if (!identical(book, b)) return;
+      error = t.remote ? 'Could not stream this. Check your connection.' : 'Could not play this file: $e';
       _loaded = false;
+    } finally {
+      if (identical(book, b) && identical(current, t)) _loadingSource = false;
+      notifyListeners();
     }
-    loading = false;
-    notifyListeners();
   }
 
   Future<void> toggle() => playing ? pause() : resume();
@@ -525,10 +601,16 @@ class Player extends ChangeNotifier {
     if (ReadAloud.i.active) await ReadAloud.i.stop();
     // Resuming live radio reconnects, rather than playing what was buffered at pause.
     if (!_loaded || book!.source == 'radio') return _load(play: true);
-    await _p.resume();
+    // At the very end: play from the top again.
+    if (_p.processingState == ProcessingState.completed) {
+      _completedHandled = false;
+      await _p.seek(Duration.zero);
+    }
+    _p.play().ignore();
   }
 
   Future<void> pause() async {
+    if (_player == null) return;
     await _p.pause();
     _save();
   }
@@ -541,7 +623,10 @@ class Player extends ChangeNotifier {
     position = to;
     b.positionMs = to.inMilliseconds;
     notifyListeners();
-    if (_loaded) await _p.seek(to);
+    if (_loaded) {
+      _completedHandled = false;
+      await _p.seek(to);
+    }
     _save();
   }
 
@@ -596,7 +681,7 @@ class Player extends ChangeNotifier {
     final b = book;
     if (b == null) return;
     b.speed = v;
-    if (_loaded) await _p.setPlaybackRate(v);
+    if (_loaded) await _p.setSpeed(v);
     _save();
     notifyListeners();
   }
@@ -620,6 +705,9 @@ class Player extends ChangeNotifier {
   void _ended() {
     final b = book;
     if (b == null) return;
+    // just_audio keeps "playing" on at the end; switch it off so the next
+    // source doesn't start by itself.
+    _p.pause().ignore();
     if (b.source == 'radio') {
       playing = false;
       error = 'This station stopped broadcasting.';
@@ -641,15 +729,12 @@ class Player extends ChangeNotifier {
       notifyListeners();
       return;
     }
-    if (sleepAtTrackEnd) {
-      sleepAtTrackEnd = false;
-      b.trackIndex++;
-      b.positionMs = 0;
-      _load(play: false);
-      _save();
-      return;
-    }
-    next();
+    final stop = sleepAtTrackEnd;
+    sleepAtTrackEnd = false;
+    b.trackIndex++;
+    b.positionMs = 0;
+    _load(play: !stop);
+    _save();
   }
 
   Future<void> close() async {
@@ -657,7 +742,8 @@ class Player extends ChangeNotifier {
     _save();
     _sleep?.cancel();
     sleepAt = null;
-    await _p.stop();
+    _stopTicker();
+    if (_player != null) await _p.stop();
     book = null;
     _loaded = false;
     playing = false;
@@ -673,4 +759,8 @@ class Player extends ChangeNotifier {
     if (b.source == 'radio') return; // nothing to resume on a live stream
     b.source == 'podcast' ? Podcasts.i.savePosition(b) : AudioLibrary.i.touch(b);
   }
+}
+
+class _Ticks extends ChangeNotifier {
+  void ping() => notifyListeners();
 }

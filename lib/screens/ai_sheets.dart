@@ -11,6 +11,7 @@ import '../core/theme.dart';
 import '../core/ui.dart';
 import '../models/book.dart';
 import '../services/ai.dart';
+import '../core/skeleton.dart';
 
 /// Makes sure an AI key exists; offers to add one if not.
 Future<bool> ensureAi(BuildContext context) async {
@@ -184,7 +185,7 @@ class _CatalogSheetState extends State<_CatalogSheet> {
       future: _loading,
       builder: (ctx, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5)));
+          return const Padding(padding: EdgeInsets.fromLTRB(20, 8, 20, 0), child: Column(children: [Shimmer(child: Bone(height: 44)), SizedBox(height: 10), SkeletonRows(count: 7, art: null, dividers: false)]));
         }
         final models = Ai.omni.catalog
             .search(_q, type: ModelType.text)

@@ -17,6 +17,7 @@ import 'ai_sheets.dart';
 import 'library_screen.dart';
 import 'marks.dart';
 import 'media_card.dart';
+import '../core/image_viewer.dart';
 
 /// Keys of books being downloaded, shared by Discover and the info page.
 final downloadingBooks = ValueNotifier<Set<String>>(const {});
@@ -184,7 +185,7 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
                   ),
                   Padding(
                     padding: EdgeInsets.only(top: top + 64, bottom: 10),
-                    child: Center(child: Hero(tag: 'net-${_b.key}', child: NetCover(url: _b.coverUrl, title: _b.title, shadow: true))),
+                    child: Center(child: ViewableImage(url: _b.coverUrl, title: _b.title, child: Hero(tag: 'net-${_b.key}', child: NetCover(url: _b.coverUrl, title: _b.title, shadow: true)))),
                   ),
                 ]),
               ),

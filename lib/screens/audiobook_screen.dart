@@ -9,6 +9,7 @@ import '../services/library.dart';
 import 'marks.dart';
 import 'media_card.dart';
 import 'player_screen.dart';
+import '../core/image_viewer.dart';
 
 void openAudiobook(BuildContext context, Audiobook b) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => AudiobookScreen(book: b)));
 
@@ -49,7 +50,7 @@ class AudiobookScreen extends StatelessWidget {
           ].join(' · ');
           return ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 128, child: AudioCover(b)),
+              SizedBox(width: 128, child: ViewableImage(path: b.coverPath, url: b.coverUrl, title: b.title, child: AudioCover(b))),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -85,7 +86,8 @@ class AudiobookScreen extends StatelessWidget {
                 ToolButton(
                   dl != null ? Icons.close_sharp : Icons.download_sharp,
                   size: 48,
-                  tooltip: dl != null ? 'Cancel download' : 'Download all',
+                  label: dl != null ? 'Cancel' : (saved > 0 ? 'Download rest' : 'Download all'),
+                  tooltip: dl != null ? 'Cancel download' : 'Download every chapter',
                   onTap: () async {
                     if (dl != null) return Downloads.i.cancel(b.id);
                     final ok = await AudioLibrary.i.download(b);

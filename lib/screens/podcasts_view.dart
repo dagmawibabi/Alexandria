@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/net_image.dart';
 import '../core/search_box.dart';
 import '../core/settings.dart';
+import '../core/skeleton.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../models/podcast.dart';
@@ -19,6 +20,7 @@ import 'media_card.dart';
 import 'player_screen.dart';
 import 'radio_view.dart';
 import 'recently_added.dart';
+import '../core/image_viewer.dart';
 
 String fmtDate(DateTime? d) {
   if (d == null) return '';
@@ -58,17 +60,12 @@ class PodcastArt extends StatelessWidget {
   }
 }
 
+/// Opens the show page straight away; a chart entry's feed address is looked
+/// up there, behind a spinner, rather than before anything appears.
 Future<void> openPodcast(BuildContext context, {String? feedUrl, PodcastHit? hit}) async {
-  var url = feedUrl;
-  if (url == null && hit != null) {
-    url = await Podcasts.i.feedFor(hit);
-    if (url == null) {
-      if (context.mounted) toast(context, 'This show has no public feed');
-      return;
-    }
-  }
-  if (url == null || !context.mounted) return;
-  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PodcastScreen(feedUrl: url!, hit: hit)));
+  final url = feedUrl ?? hit?.feedUrl;
+  if (url == null && hit == null) return;
+  await Navigator.of(context).push(MaterialPageRoute(builder: (_) => PodcastScreen(feedUrl: url, hit: hit)));
 }
 
 /// The Podcasts tab: your shows, shortcuts to episode lists, explore and search.
@@ -284,7 +281,7 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
     return [
       SliverToBoxAdapter(child: SectionHeader('', _searching ? 'Searching…' : 'Shows · ${r.length}', padding: const EdgeInsets.fromLTRB(20, 20, 20, 6))),
       if (_searching)
-        const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5))))
+        const SliverToBoxAdapter(child: SkeletonRows(count: 7, art: 60, padding: EdgeInsets.fromLTRB(20, 4, 20, 0)))
       else if (r.isEmpty)
         SliverToBoxAdapter(
           child: Padding(
@@ -315,7 +312,7 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
           future: _explore,
           builder: (context, snap) {
             if (snap.connectionState != ConnectionState.done) {
-              return const Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5)));
+              return const SkeletonGrid(count: 9, padding: EdgeInsets.fromLTRB(20, 14, 20, 0));
             }
             final list = snap.data ?? const <PodcastHit>[];
             if (list.isEmpty) {
@@ -494,8 +491,10 @@ class _ShowRow extends StatelessWidget {
 
 /// One show: header, subscribe, and its episodes.
 class PodcastScreen extends StatefulWidget {
-  const PodcastScreen({super.key, required this.feedUrl, this.hit});
-  final String feedUrl;
+  const PodcastScreen({super.key, this.feedUrl, this.hit}) : assert(feedUrl != null || hit != null);
+
+  /// Null for a chart entry, whose address is looked up from [hit].
+  final String? feedUrl;
   final PodcastHit? hit;
 
   @override
@@ -504,16 +503,36 @@ class PodcastScreen extends StatefulWidget {
 
 class _PodcastScreenState extends State<PodcastScreen> {
   late Future<Podcast?> _feed = _load();
-  bool _oldest = false;
+  /// The last sorted list and what it was made from, so a rebuild (each
+  /// download tick, each played mark) doesn't sort thousands of titles again.
+  (List<Episode>, EpisodeSort, List<Episode>)? _sorted;
+
+  List<Episode> _inOrder(Podcast pod, EpisodeSort sort) {
+    final c = _sorted;
+    if (c != null && identical(c.$1, pod.episodes) && c.$2 == sort) return c.$3;
+    final out = sort.apply(pod.episodes);
+    _sorted = (pod.episodes, sort, out);
+    return out;
+  }
 
   /// 'all', or an episode stage: 'unplayed', 'started', 'played'.
   String _filter = 'all';
 
   final _search = TextEditingController();
 
-  Future<Podcast?> _load() {
+  late String? _url = widget.feedUrl;
+
+  /// The show has no public feed (only known after looking it up).
+  bool _noFeed = false;
+
+  Future<Podcast?> _load() async {
     Podcasts.i.unreachable = false;
-    return Podcasts.i.feed(widget.feedUrl, refresh: true);
+    _url ??= await Podcasts.i.feedFor(widget.hit!);
+    if (_url == null) {
+      _noFeed = !Podcasts.i.unreachable;
+      return null;
+    }
+    return Podcasts.i.feed(_url!, refresh: true);
   }
 
   @override
@@ -531,17 +550,17 @@ class _PodcastScreenState extends State<PodcastScreen> {
       body: FutureBuilder<Podcast?>(
         future: _feed,
         // Show what we already know while the feed refreshes.
-        initialData: Podcasts.i.cached(widget.feedUrl),
+        initialData: _url == null ? null : Podcasts.i.cached(_url!),
         builder: (context, snap) {
           final pod = snap.data;
           final loading = snap.connectionState != ConnectionState.done;
           if (pod == null) {
-            if (loading) return const Center(child: CircularProgressIndicator(strokeWidth: 1.5));
+            if (loading) return _PodcastSkeleton(hit: widget.hit);
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(30),
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  Text(Podcasts.i.unreachable ? 'Couldn’t load this show. Check your connection.' : 'This feed could not be read.', textAlign: TextAlign.center, style: TextStyle(color: t.muted)),
+                  Text(Podcasts.i.unreachable ? 'Couldn’t load this show. Check your connection.' : (_noFeed ? 'This show has no public feed.' : 'This feed could not be read.'), textAlign: TextAlign.center, style: TextStyle(color: t.muted)),
                   const SizedBox(height: 12),
                   ToolButton(Icons.refresh_sharp, label: 'Retry', size: 36, onTap: () => setState(() => _feed = _load())),
                 ]),
@@ -549,13 +568,22 @@ class _PodcastScreenState extends State<PodcastScreen> {
             );
           }
           return ListenableBuilder(
-            listenable: Listenable.merge([Podcasts.i, Player.i, Downloads.i]),
+            // Not the player: it ticks several times a second, and each episode
+            // row follows it on its own.
+            listenable: Listenable.merge([Podcasts.i, Downloads.i, Settings.i]),
             builder: (context, _) {
               final subbed = Podcasts.i.subscribed(pod.feedUrl);
-              final sorted = _oldest ? pod.episodes.reversed.toList() : pod.episodes;
+              final sort = Podcasts.i.sortOf(pod.feedUrl);
+              final sorted = _inOrder(pod, sort);
               final query = _search.text.trim();
               final eps = sorted.where((e) => (_filter == 'all' || Podcasts.i.stage(e) == _filter) && (query.isEmpty || e.matches(query))).toList();
-              int count(String stage) => pod.episodes.where((e) => Podcasts.i.stage(e) == stage).length;
+              // One pass for all the filter counts.
+              final counts = <String, int>{};
+              for (final e in pod.episodes) {
+                final st = Podcasts.i.stage(e);
+                counts[st] = (counts[st] ?? 0) + 1;
+              }
+              int count(String stage) => counts[stage] ?? 0;
               return RefreshIndicator(
                 onRefresh: () => ApiCache.fresh(() async {
                   setState(() => _feed = _load());
@@ -570,7 +598,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                       // sit right under the box instead of behind the keyboard.
                       if (query.isEmpty) ...[
                       Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        SizedBox(width: 120, child: PodcastArt(pod.imageUrl ?? widget.hit?.artwork, title: pod.title)),
+                        SizedBox(width: 120, child: ViewableImage(url: pod.imageUrl ?? widget.hit?.artwork, title: pod.title, child: PodcastArt(pod.imageUrl ?? widget.hit?.artwork, title: pod.title))),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -591,6 +619,8 @@ class _PodcastScreenState extends State<PodcastScreen> {
                         const SizedBox(width: 10),
                         if (pod.episodes.isNotEmpty) ToolButton(Icons.play_arrow_sharp, size: 48, tooltip: 'Play latest', onTap: () => playEpisode(context, pod.episodes.first)),
                         const SizedBox(width: 10),
+                        _DownloadAll(pod: pod, episodes: eps, filtered: _filter != 'all'),
+                        const SizedBox(width: 10),
                         ToolButton(Icons.ios_share_sharp, size: 48, tooltip: 'Share card', onTap: () => showMediaCard(context, ShareItem.podcast(pod, Podcasts.i.showMark(pod.feedUrl)))),
                       ]),
                       const SizedBox(height: 14),
@@ -608,7 +638,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                         '',
                         query.isEmpty ? 'Episodes' : '${eps.length} found',
                         padding: const EdgeInsets.fromLTRB(0, 24, 0, 8),
-                        trailing: Tag(_oldest ? 'Oldest first' : 'Newest first', onTap: () => setState(() => _oldest = !_oldest)),
+                        trailing: Tag(sort.label, onTap: () => showEpisodeSort(context, pod.feedUrl)),
                       ),
                       // Keyed so it keeps focus when the details above it go away.
                       SearchBox(
@@ -630,6 +660,12 @@ class _PodcastScreenState extends State<PodcastScreen> {
                             Padding(padding: const EdgeInsets.only(right: 6), child: Tag('$name · $n', filled: _filter == id, onTap: () => setState(() => _filter = id))),
                         ]),
                       ),
+                      if (Downloads.i.progress[Podcasts.batchKey(pod.feedUrl)] case final p?) ...[
+                        const SizedBox(height: 10),
+                        Label('Downloading episodes · ${(p * 100).round()}%', size: 9),
+                        const SizedBox(height: 4),
+                        LinearProgressIndicator(value: p),
+                      ],
                       if (eps.isEmpty) Padding(padding: const EdgeInsets.symmetric(vertical: 24), child: Center(child: Text(query.isEmpty ? 'No episodes in this view.' : 'No episodes match “$query”.', textAlign: TextAlign.center, style: TextStyle(color: t.muted)))),
                     ]),
                   ),
@@ -648,6 +684,39 @@ class _PodcastScreenState extends State<PodcastScreen> {
   }
 }
 
+/// Saves every episode in view (all of them, or the current filter), or cancels that.
+class _DownloadAll extends StatelessWidget {
+  const _DownloadAll({required this.pod, required this.episodes, required this.filtered});
+  final Podcast pod;
+  final List<Episode> episodes;
+  final bool filtered;
+
+  @override
+  Widget build(BuildContext context) {
+    final key = Podcasts.batchKey(pod.feedUrl);
+    final p = Downloads.i.progress[key];
+    if (p != null) {
+      return ToolButton(Icons.close_sharp, size: 48, tooltip: 'Cancel downloading ${(p * 100).round()}%', onTap: () => Downloads.i.cancel(key));
+    }
+    final todo = Podcasts.i.notDownloaded(episodes);
+    final all = episodes.isNotEmpty && todo.isEmpty;
+    return ToolButton(
+      all ? Icons.download_done_sharp : Icons.download_sharp,
+      size: 48,
+      active: all,
+      tooltip: all ? 'All downloaded' : 'Download all',
+      onTap: todo.isEmpty
+          ? null
+          : () async {
+              final which = filtered ? 'the ${todo.length} episodes in this view' : 'all ${todo.length} episodes';
+              if (todo.length > 1 && !await confirm(context, 'Download all', 'Saves $which for offline listening, one at a time. Cancel any time from here or the downloads page.')) return;
+              final ok = await Podcasts.i.downloadAll(pod, todo);
+              if (context.mounted && !ok && !Downloads.i.cancelled(key)) toast(context, 'Some episodes didn’t download. Tap again to retry them.');
+            },
+    );
+  }
+}
+
 /// An episode with play, download and more.
 class EpisodeRow extends StatelessWidget {
   const EpisodeRow({super.key, required this.episode, this.podcast, this.showShow = false});
@@ -655,8 +724,12 @@ class EpisodeRow extends StatelessWidget {
   final Podcast? podcast;
   final bool showShow;
 
+  // Follows playback, downloads and played state itself, so a long episode
+  // list doesn't have to rebuild whole on every player tick.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: Listenable.merge([Podcasts.i, Player.i, Downloads.i]), builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final t = Tokens.of(context);
     final pods = Podcasts.i;
     final e = episode;
@@ -739,7 +812,7 @@ Future<void> showEpisode(BuildContext context, Episode e, {Podcast? podcast}) {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 64, child: PodcastArt(e.art, title: e.podcastTitle)),
+              SizedBox(width: 64, child: ViewableImage(url: e.art, title: e.title, child: PodcastArt(e.art, title: e.podcastTitle))),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -850,4 +923,100 @@ Future<void> showQueue(BuildContext context) {
       },
     );
   });
+}
+
+/// Picks the order of a show's episodes. Remembered for that show; "Use
+/// default" hands it back to the order set in Settings.
+Future<void> showEpisodeSort(BuildContext context, String feedUrl) {
+  return showSheet(context, scroll: false, builder: (ctx) {
+    final t = Tokens.of(ctx);
+    final pods = Podcasts.i;
+    final current = pods.sortOf(feedUrl);
+    final own = pods.hasOwnSort(feedUrl);
+    final fallback = EpisodeSort.parse(Settings.i.episodeSort);
+    Widget option(String label, bool on, VoidCallback pick, {String? hint}) => ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+          title: Text(label, style: TextStyle(color: t.ink, fontWeight: on ? FontWeight.w700 : FontWeight.w500)),
+          subtitle: hint == null ? null : Text(hint, style: TextStyle(color: t.muted, fontSize: 12.5)),
+          trailing: on ? Icon(Icons.check_sharp, color: t.accent) : null,
+          onTap: () {
+            haptic();
+            pick();
+            Navigator.pop(ctx);
+          },
+        );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+      child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Label('Order episodes'),
+        const SizedBox(height: 6),
+        for (final v in EpisodeSort.values) option(v.label, own && v == current, () => pods.setSort(feedUrl, v)),
+        Divider(color: t.line, height: 16),
+        option('Use default', !own, () => pods.setSort(feedUrl, null), hint: '${fallback.label}, as set in Settings'),
+      ]),
+    );
+  });
+}
+
+/// The show page while its feed loads, laid out like the page itself. What a
+/// chart or search entry already told us (art, title, author) shows for real.
+class _PodcastSkeleton extends StatelessWidget {
+  const _PodcastSkeleton({this.hit});
+  final PodcastHit? hit;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final h = hit;
+    return ListView(physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.fromLTRB(20, 4, 20, 0), children: [
+      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        SizedBox(width: 120, child: h?.artwork != null ? PodcastArt(h!.artwork, title: h.title) : const Shimmer(child: Bone(square: true))),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            if (h != null) ...[
+              Text(h.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.15)),
+              if (h.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(h.author, maxLines: 2, style: TextStyle(color: t.muted))),
+              const SizedBox(height: 10),
+              const Shimmer(child: Bone(width: 90, height: 9)),
+            ] else
+              const Shimmer(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Bone(height: 18),
+                  SizedBox(height: 8),
+                  Bone(width: 150, height: 18),
+                  SizedBox(height: 12),
+                  Bone(width: 110, height: 12),
+                  SizedBox(height: 12),
+                  Bone(width: 90, height: 9),
+                ]),
+              ),
+          ]),
+        ),
+      ]),
+      const SizedBox(height: 16),
+      // Subscribe, play latest, download all, share.
+      const Shimmer(
+        child: Row(children: [
+          Expanded(child: Bone(height: 48)),
+          SizedBox(width: 10),
+          Bone(width: 48, height: 48),
+          SizedBox(width: 10),
+          Bone(width: 48, height: 48),
+          SizedBox(width: 10),
+          Bone(width: 48, height: 48),
+        ]),
+      ),
+      const SizedBox(height: 22),
+      const SkeletonText(lines: 4),
+      const SizedBox(height: 28),
+      const Shimmer(child: Row(children: [Bone(width: 80, height: 12), Spacer(), Bone(width: 96, height: 26)])),
+      const SizedBox(height: 14),
+      const Shimmer(child: Bone(height: 44)),
+      const SizedBox(height: 12),
+      const Shimmer(child: Row(children: [Bone(width: 62, height: 30), SizedBox(width: 6), Bone(width: 92, height: 30), SizedBox(width: 6), Bone(width: 96, height: 30)])),
+      const SizedBox(height: 6),
+      const SkeletonRows(count: 6, art: null, lines: 2),
+    ]);
+  }
 }

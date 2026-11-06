@@ -348,6 +348,11 @@ class Settings extends ChangeNotifier {
   bool get openPlayerOnPlay => _get('openPlayerOnPlay', true);
   set openPlayerOnPlay(bool v) => set('openPlayerOnPlay', v);
 
+  /// How a show's episodes are ordered unless that show has its own order:
+  /// an [EpisodeSort] name (newest, oldest, az, za).
+  String get episodeSort => _get('episodeSort', 'newest');
+  set episodeSort(String v) => set('episodeSort', v);
+
   double get ttsRate => _get('ttsRate', 0.5);
   set ttsRate(double v) => set('ttsRate', v);
 

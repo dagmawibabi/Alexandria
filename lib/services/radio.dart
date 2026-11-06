@@ -315,6 +315,16 @@ class RadioDirectory extends ChangeNotifier {
   /// Every station filed in a folder, favourited or played.
   List<Station> get kept => stations.values.toList();
 
+  /// The station before (-1) or after (1) [id], for swiping in the player: through
+  /// your favourites when it's one of them, otherwise through every station you
+  /// kept. Wraps around, like a dial. Null with nothing to switch to.
+  Station? neighbour(String id, int dir) {
+    final list = isFavorite(id) ? favorites : kept;
+    final i = list.indexWhere((s) => s.id == id);
+    if (i < 0 || list.length < 2) return null;
+    return list[(i + dir) % list.length];
+  }
+
   // ---------------- playing ----------------
 
   bool isCurrent(String id) => Player.i.book?.source == 'radio' && Player.i.book?.sourceKey == id;

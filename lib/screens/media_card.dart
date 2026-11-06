@@ -253,7 +253,7 @@ class _MediaStudioState extends State<MediaStudio> {
         SizedBox(
           height: 56,
           child: ListView(scrollDirection: Axis.horizontal, children: [
-            for (var n = 0; n < cardStyles.length; n++)
+            for (final n in cardStyleOrder)
               GestureDetector(
                 onTap: () {
                   haptic();

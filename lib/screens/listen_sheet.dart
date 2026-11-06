@@ -8,6 +8,7 @@ import '../core/theme.dart';
 import '../core/ui.dart';
 import '../services/ai.dart';
 import '../services/speech.dart';
+import '../core/skeleton.dart';
 
 /// Voice setup for read-aloud. With [play], leads with a "Start listening"
 /// button and returns true when the reader should begin.
@@ -263,7 +264,7 @@ class _ListenPanelState extends State<ListenPanel> {
                 ),
               );
             }
-            if (!snap.hasData) return const Center(child: SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5)));
+            if (!snap.hasData) return ListView(physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.symmetric(horizontal: 12), children: const [SkeletonRows(count: 6, art: null)]);
             final q = _search.text.toLowerCase();
             final voices = [
               if (q.isEmpty) Voice(id: '', name: 'Default', provider: engine, description: engine == 'device' ? 'Your phone\'s chosen voice' : 'The provider\'s standard voice'),

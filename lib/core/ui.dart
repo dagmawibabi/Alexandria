@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../models/book.dart';
+import 'net_image.dart';
 import 'settings.dart';
 import 'theme.dart';
 
@@ -574,7 +575,7 @@ class Cover extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final path = book.coverPath;
-    final hasFile = path != null && File(path).existsSync();
+    final hasFile = fileExists(path);
     return AspectRatio(
       aspectRatio: 2 / 3,
       child: Container(
@@ -586,7 +587,7 @@ class Cover extends StatelessWidget {
           boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: t.dark ? .5 : (t.zen ? .1 : .12)), blurRadius: t.zen ? 18 : 14, offset: const Offset(0, 6))],
         ),
         child: Stack(fit: StackFit.expand, children: [
-          monoImage(hasFile ? Image.file(File(path), fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, _, _) => GeneratedCover(book)) : GeneratedCover(book)),
+          monoImage(hasFile ? SizedFileImage(File(path!), errorBuilder: (_, _, _) => GeneratedCover(book)) : GeneratedCover(book)),
           // spine shading
           if (!t.zen) Positioned(left: 0, top: 0, bottom: 0, width: 6, child: Container(color: Colors.black.withValues(alpha: .12))),
           if (showProgress && book.progress > 0)

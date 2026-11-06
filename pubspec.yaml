@@ -28,8 +28,9 @@ dependencies:
   crypto: ^3.0.8
   wakelock_plus: ^1.8.2
   flutter_tts: ^4.2.5
-  audioplayers: ^6.8.1
   audio_service: ^0.18.19
+  just_audio: ^0.10.6
+  audio_session: ^0.2.4
 
 dev_dependencies:
   flutter_test:

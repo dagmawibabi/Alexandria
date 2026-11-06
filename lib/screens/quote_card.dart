@@ -53,6 +53,15 @@ const cardStyles = [
   CardStyle('Cover', Color(0xFF111111), Color(0xFFFFFFFF), 'Newsreader', cover: true),
 ];
 
+/// The order the style picker shows [cardStyles] in: Cover first. The list
+/// itself keeps its order, since the chosen style is saved by its position there.
+final cardStyleOrder = [
+  for (var i = 0; i < cardStyles.length; i++)
+    if (cardStyles[i].cover) i,
+  for (var i = 0; i < cardStyles.length; i++)
+    if (!cardStyles[i].cover) i,
+];
+
 const _swatches = <Color>[
   Color(0xFF111111), Color(0xFFFFFFFF), Color(0xFFF1E4C9), Color(0xFF1D3F8F), Color(0xFF2D6BFF), //
   Color(0xFF0F5C4A), Color(0xFF00A86B), Color(0xFF7B61FF), Color(0xFF5A1E3C), Color(0xFFE5243B), Color(0xFFFFC300),
@@ -189,7 +198,7 @@ class _QuoteStudioState extends State<QuoteStudio> {
         SizedBox(
           height: 64,
           child: ListView(scrollDirection: Axis.horizontal, children: [
-            for (var i = 0; i < cardStyles.length; i++)
+            for (final i in cardStyleOrder)
               GestureDetector(
                 onTap: () {
                   haptic();

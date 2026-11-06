@@ -21,10 +21,26 @@ String _size(int bytes) {
   return '${(bytes / (1 << 20)).toStringAsFixed(bytes >= 100 << 20 ? 0 : 1)} MB';
 }
 
+/// Sizes of finished downloads, which don't change: read from disk once, not
+/// on every rebuild (the page rebuilds with each progress tick while downloading).
+final _sizes = <String, int>{};
+
 int _fileSize(String? path) {
   if (path == null) return 0;
+  final known = _sizes[path];
+  if (known != null) return known;
   final f = File(path);
-  return f.existsSync() ? f.lengthSync() : 0;
+  if (!f.existsSync()) return 0;
+  return _sizes[path] = f.lengthSync();
+}
+
+String _mb(int bytes) => bytes >= 1 << 30 ? '${(bytes / (1 << 30)).toStringAsFixed(2)} GB' : '${(bytes / (1 << 20)).toStringAsFixed(1)} MB';
+
+String _left(Duration d) {
+  final s = d.inSeconds;
+  if (s < 60) return '${s}s left';
+  if (s < 3600) return '${(s / 60).ceil()} min left';
+  return '${s ~/ 3600} h ${(s % 3600 / 60).round()} min left';
 }
 
 /// What's still arriving, for the jobs [mine] picks out.
@@ -38,27 +54,87 @@ class _Active extends StatelessWidget {
     final active = Downloads.i.progress.entries.where((e) => mine(e.key)).toList();
     if (active.isEmpty) return const SizedBox.shrink();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SectionHeader('', 'Downloading', padding: EdgeInsets.fromLTRB(0, 18, 0, 8)),
-      for (final e in active)
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: Panel(
-            padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
-            child: Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(Downloads.i.labels[e.key] ?? 'Downloading', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 6),
-                  LinearProgressIndicator(value: e.value < 0 ? null : e.value),
-                ]),
-              ),
-              IconButton(tooltip: 'Cancel', onPressed: () => Downloads.i.cancel(e.key), icon: Icon(Icons.close_sharp, color: t.muted)),
-            ]),
-          ),
-        ),
-      Text('Keeps going in the background.', style: TextStyle(color: t.muted, fontSize: 12.5)),
+      SectionHeader('', active.length == 1 ? 'Downloading' : 'Downloading · ${active.length}', padding: const EdgeInsets.fromLTRB(0, 18, 0, 8)),
+      for (final e in active) Padding(padding: const EdgeInsets.only(bottom: 8), child: _ActiveRow(jobKey: e.key, value: e.value)),
+      Text('Keeps going in the background, and picks up where it stopped if the connection drops.', style: TextStyle(color: t.muted, fontSize: 12.5)),
       const SizedBox(height: 10),
     ]);
+  }
+}
+
+/// One download in progress: its art, what it is, and how it's going.
+class _ActiveRow extends StatelessWidget {
+  const _ActiveRow({required this.jobKey, required this.value});
+  final String jobKey;
+  final double value;
+
+  /// What a job key stands for: a show's "download all", an episode, or an
+  /// audiobook (whole, or one chapter as "id#n").
+  ({Widget art, String title, String? sub, VoidCallback? open}) _what(BuildContext context) {
+    final key = jobKey;
+    final label = Downloads.i.labels[key];
+    if (key.startsWith('show:')) {
+      final pod = Podcasts.i.cached(key.substring(5));
+      final title = pod?.title ?? label ?? 'Episodes';
+      return (art: PodcastArt(pod?.imageUrl, title: title), title: title, sub: label?.split(': ').last ?? 'All episodes', open: pod == null ? null : () => openPodcast(context, feedUrl: pod.feedUrl));
+    }
+    final ep = Podcasts.i.states[key]?.episode;
+    if (ep != null) return (art: PodcastArt(ep.art, title: ep.podcastTitle), title: ep.title, sub: ep.podcastTitle, open: () => showEpisode(context, ep));
+    final parts = key.split('#');
+    final book = AudioLibrary.i.byId(parts.first);
+    if (book != null) {
+      final n = parts.length > 1 ? int.tryParse(parts[1]) : null;
+      final track = n != null && n < book.tracks.length ? book.tracks[n] : null;
+      final sub = track != null ? 'Chapter ${n! + 1} · ${track.title}' : '${book.tracks.length} chapters${book.author.isEmpty ? '' : ' · ${book.author}'}';
+      return (art: AudioCover(book, shadow: false), title: book.title, sub: sub, open: () => openAudiobook(context, book));
+    }
+    final t = Tokens.of(context);
+    return (art: AspectRatio(aspectRatio: 1, child: Container(color: t.line, child: Icon(Icons.download_sharp, color: t.muted))), title: label ?? 'Downloading', sub: null, open: null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    final w = _what(context);
+    final st = Downloads.i.stats[jobKey];
+    final pct = value >= 0 ? '${(value * 100).floor()}%' : null;
+    final String status;
+    if (st != null && st.attempt > 1 && st.rate == 0) {
+      status = 'Connection dropped · retrying (try ${st.attempt} of 5)';
+    } else if (st == null || st.got == 0) {
+      status = pct != null && value > 0 ? pct : 'Starting…';
+    } else {
+      final left = st.left;
+      status = [
+        ?pct,
+        st.total > 0 ? '${_mb(st.got)} of ${_mb(st.total)}' : _mb(st.got),
+        if (st.rate > 0) '${_mb(st.rate.round())}/s',
+        if (left != null) _left(left),
+      ].join(' · ');
+    }
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: w.open,
+      child: Panel(
+        padding: const EdgeInsets.fromLTRB(12, 12, 4, 12),
+        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SizedBox(width: 56, child: w.art),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (w.sub != null) Label(w.sub!, size: 9, color: t.accent),
+              if (w.sub != null) const SizedBox(height: 3),
+              Text(w.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, height: 1.25)),
+              const SizedBox(height: 8),
+              ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: value < 0 ? null : value, minHeight: 4)),
+              const SizedBox(height: 6),
+              Label(status, size: 9),
+            ]),
+          ),
+          IconButton(tooltip: 'Cancel', onPressed: () => Downloads.i.cancel(jobKey), icon: Icon(Icons.close_sharp, color: t.muted)),
+        ]),
+      ),
+    );
   }
 }
 
@@ -77,7 +153,8 @@ class EpisodeDownloadsScreen extends StatelessWidget {
       appBar: AppBar(title: AppTitle('Downloaded episodes')),
       bottomNavigationBar: const PagePlayer(),
       body: ListenableBuilder(
-        listenable: Listenable.merge([Podcasts.i, Downloads.i, Player.i]),
+        // Not the player, which ticks several times a second: rows follow it themselves.
+        listenable: Listenable.merge([Podcasts.i, Downloads.i]),
         builder: (context, _) {
           final episodes = Podcasts.i.downloaded.where((s) => _fileSize(s.localPath) > 0).toList();
           final used = episodes.fold(0, (a, s) => a + _fileSize(s.localPath));
@@ -100,7 +177,7 @@ class AudiobookDownloads extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([Downloads.i, AudioLibrary.i, Player.i]),
+      listenable: Listenable.merge([Downloads.i, AudioLibrary.i]),
       builder: (context, _) {
         // Books made from your own files are always offline too.
         final books = AudioLibrary.i.recent.where((b) => b.tracks.any((t) => !t.remote)).toList();
@@ -123,8 +200,11 @@ class _BookRow extends StatelessWidget {
   const _BookRow({required this.book});
   final Audiobook book;
 
+  // Follows the player itself, so only this row redraws as it plays.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(listenable: Player.i, builder: (context, _) => _build(context));
+
+  Widget _build(BuildContext context) {
     final t = Tokens.of(context);
     final b = book;
     final saved = b.tracks.where((x) => !x.remote).length;

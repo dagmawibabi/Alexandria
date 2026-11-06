@@ -13,6 +13,8 @@ import 'marks.dart';
 import 'media_card.dart';
 import 'player_screen.dart' show playStation;
 import 'podcasts_view.dart' show PodcastArt;
+import '../core/image_viewer.dart';
+import '../core/skeleton.dart';
 
 /// Global Radio: browse, search by name and country, favourites and recents.
 class RadioPane extends StatefulWidget {
@@ -166,7 +168,7 @@ class RadioPaneState extends State<RadioPane> {
           ),
         ),
       if (!local && _loading)
-        const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(40), child: Center(child: CircularProgressIndicator(strokeWidth: 1.5))))
+        const SliverToBoxAdapter(child: SkeletonRows(count: 8, art: 50, padding: EdgeInsets.symmetric(horizontal: 20)))
       else if (shown.isEmpty)
         SliverToBoxAdapter(
           child: Padding(
@@ -222,7 +224,7 @@ class _CountryPickerState extends State<_CountryPicker> {
           child: FutureBuilder<List<RadioCountry>>(
             future: _all,
             builder: (context, snap) {
-              if (snap.connectionState != ConnectionState.done) return const Center(child: CircularProgressIndicator(strokeWidth: 1.5));
+              if (snap.connectionState != ConnectionState.done) return ListView(physics: const NeverScrollableScrollPhysics(), children: const [SkeletonRows(count: 12, art: null, lines: 1)]);
               final list = (snap.data ?? const <RadioCountry>[]).where((c) => _q.isEmpty || c.name.toLowerCase().contains(_q) || c.code.toLowerCase() == _q).toList();
               if (list.isEmpty) {
                 return Center(child: Text(snap.data?.isEmpty ?? true ? 'The radio directory isn’t answering right now.' : 'No country by that name.', textAlign: TextAlign.center, style: TextStyle(color: t.muted)));
@@ -344,7 +346,7 @@ Future<void> showStationMenu(BuildContext context, Station s) {
           padding: const EdgeInsets.fromLTRB(20, 4, 20, 24),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 68, child: PodcastArt(s.favicon, title: s.name)),
+              SizedBox(width: 68, child: ViewableImage(url: s.favicon, title: s.name, child: PodcastArt(s.favicon, title: s.name))),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -67,6 +67,10 @@ const _ua = {'User-Agent': 'Alexandria-Reader/1.0 (podcast player)'};
 
 String _plain(String s) => (html.parseFragment(s).text ?? '').replaceAll(RegExp(r'[ \t]+'), ' ').replaceAll(RegExp(r'\n\s*\n\s*'), '\n\n').trim();
 
+/// [Podcasts.parseFeed] for a background isolate. Top-level on purpose: the
+/// isolate must be handed a plain function, nothing tied to the Podcasts class.
+Podcast? _parseFeedInIsolate((String, String) a) => Podcasts.parseFeed(a.$1, a.$2);
+
 /// Subscriptions, listening history, the queue and downloaded episodes.
 class Podcasts extends ChangeNotifier {
   Podcasts._();
@@ -81,6 +85,10 @@ class Podcasts extends ChangeNotifier {
 
   /// Library folders each show is filed in, by feed address.
   final Map<String, List<String>> showFolders = {};
+
+  /// Episode order each show was set to, by feed address ([EpisodeSort] names).
+  /// Shows not in here follow the default in Settings.
+  final Map<String, String> showSorts = {};
 
   /// Last speed used for podcasts, applied to the next episode.
   double speed = 1;
@@ -108,6 +116,9 @@ class Podcasts extends ChangeNotifier {
     for (final e in ((j['showFolders'] as Map?) ?? const {}).entries) {
       if (e.value is List) showFolders['${e.key}'] = (e.value as List).cast<String>();
     }
+    for (final e in ((j['showSorts'] as Map?) ?? const {}).entries) {
+      if (e.value is String) showSorts['${e.key}'] = e.value as String;
+    }
     for (final s in subscriptions) {
       _feeds[s.feedUrl] = s;
     }
@@ -124,6 +135,7 @@ class Podcasts extends ChangeNotifier {
         'speed': speed,
         'showMarks': {for (final e in showMarks.entries) if (!e.value.isEmpty) e.key: e.value.toJson()},
         'showFolders': {for (final e in showFolders.entries) if (e.value.isNotEmpty) e.key: e.value},
+        'showSorts': showSorts,
       };
 
   void _persist() {
@@ -199,6 +211,10 @@ class Podcasts extends ChangeNotifier {
     for (final e in ((j['showFolders'] as Map?) ?? const {}).entries) {
       if (e.value is List) showFolders['${e.key}'] = {...foldersOf('${e.key}'), ...(e.value as List).cast<String>()}.toList();
     }
+    // A show's order set on this device wins over the backup's.
+    for (final e in ((j['showSorts'] as Map?) ?? const {}).entries) {
+      if (e.value is String) showSorts.putIfAbsent('${e.key}', () => e.value as String);
+    }
     _persist();
   }
 
@@ -253,13 +269,34 @@ class Podcasts extends ChangeNotifier {
   Podcast? cached(String feedUrl) => _feeds[feedUrl];
 
   /// Loads and parses an RSS feed. Subscribed shows keep their state and are re-saved.
-  Future<Podcast?> feed(String url, {bool refresh = false}) async {
-    if (!refresh && _feeds[url] != null && _feeds[url]!.episodes.isNotEmpty && _feeds[url]!.subscribedAt == null) return _feeds[url];
+  Future<Podcast?> feed(String url, {bool refresh = false}) {
+    if (!refresh && _feeds[url] != null && _feeds[url]!.episodes.isNotEmpty && _feeds[url]!.subscribedAt == null) return Future.value(_feeds[url]);
+    // The show page and the player can ask for the same feed at once: share one fetch.
+    // The block body matters: `() => _loading.remove(url)` would return this very
+    // future, and whenComplete waits on a returned future, so it would wait forever.
+    return _loading[url] ??= _fetchFeed(url).whenComplete(() {
+      _loading.remove(url);
+    });
+  }
+
+  final _loading = <String, Future<Podcast?>>{};
+
+  /// What each feed's last parsed body looked like (length and hash).
+  final _parsedSig = <String, (int, int)>{};
+
+  Future<Podcast?> _fetchFeed(String url) async {
     // New episodes are what feeds are for, so these go stale within the hour.
     final body = await _get(url, json: false, ttl: const Duration(hours: 1));
     if (body is! String) return _feeds[url];
-    final parsed = parseFeed(url, body);
+    // Within the hour the body comes from the disk cache unchanged: don't parse
+    // megabytes again for every subscription each time the tab opens.
+    final sig = (body.length, body.hashCode);
+    if (_parsedSig[url] == sig && (_feeds[url]?.episodes.isNotEmpty ?? false)) return _feeds[url];
+    // A long-running show's feed is megabytes of XML and HTML; parsing that here
+    // would freeze the screen, so big ones go to a background isolate.
+    final parsed = body.length < 200000 ? parseFeed(url, body) : await compute(_parseFeedInIsolate, (url, body));
     if (parsed == null) return _feeds[url];
+    _parsedSig[url] = sig;
     final sub = subscriptions.where((s) => s.feedUrl == url).firstOrNull;
     if (sub != null) {
       sub
@@ -275,6 +312,7 @@ class Podcasts extends ChangeNotifier {
     }
     return _feeds[url] = parsed;
   }
+
 
   /// RSS 2.0 with the iTunes extensions most feeds use.
   static Podcast? parseFeed(String url, String body) {
@@ -453,6 +491,25 @@ class Podcasts extends ChangeNotifier {
 
   List<String> foldersOf(String feedUrl) => showFolders[feedUrl] ?? const [];
 
+  /// The order a show's episodes are listed in: its own, else the default.
+  EpisodeSort sortOf(String feedUrl) => EpisodeSort.parse(showSorts[feedUrl] ?? Settings.i.episodeSort);
+
+  /// Whether the show has an order of its own (rather than following the default).
+  bool hasOwnSort(String feedUrl) => showSorts.containsKey(feedUrl);
+
+  /// Remembers [sort] for this show; null goes back to following the default.
+  void setSort(String feedUrl, EpisodeSort? sort) {
+    sort == null ? showSorts.remove(feedUrl) : showSorts[feedUrl] = sort.name;
+    _persist();
+  }
+
+  /// Every show goes back to the default order (the setting's "apply to all").
+  void clearSorts() {
+    if (showSorts.isEmpty) return;
+    showSorts.clear();
+    _persist();
+  }
+
   void toggleFolder(String feedUrl, String folderId) {
     final cur = foldersOf(feedUrl);
     showFolders[feedUrl] = cur.contains(folderId) ? ([...cur]..remove(folderId)) : [...cur, folderId];
@@ -511,6 +568,27 @@ class Podcasts extends ChangeNotifier {
     await Player.i.open(asBook(e));
   }
 
+  /// Loads a show's episodes if they aren't here yet (after a restart, for a
+  /// show you aren't subscribed to), so the player can move between them.
+  Future<void> ensureFeed(String feedUrl) async {
+    if (_feeds[feedUrl]?.episodes.isNotEmpty ?? false) return;
+    await feed(feedUrl);
+    notifyListeners();
+  }
+
+  /// The episode a swipe in the player switches to from [e]. Forward (1): the
+  /// queue's next, else the show's next newer episode. Back (-1): the show's
+  /// next older one. Null when there's none.
+  Episode? neighbour(Episode e, int dir) {
+    if (dir > 0 && queue.isNotEmpty) return queue.first;
+    final eps = _feeds[e.feedUrl]?.episodes ?? const <Episode>[];
+    final i = eps.indexWhere((x) => x.guid == e.guid);
+    if (i < 0) return null;
+    // Newest first, so newer is up the list.
+    final j = dir > 0 ? i - 1 : i + 1;
+    return j >= 0 && j < eps.length ? eps[j] : null;
+  }
+
   /// Called by the player as it saves.
   void savePosition(Audiobook b) {
     final s = states[b.sourceKey];
@@ -566,10 +644,9 @@ class Podcasts extends ChangeNotifier {
 
   // ---------------- downloads ----------------
 
-  bool isDownloaded(Episode e) {
-    final path = states[e.guid]?.localPath;
-    return path != null && File(path).existsSync();
-  }
+  // Remembered once seen: the show page asks this for every episode on each
+  // rebuild. Removing a download clears localPath, so a yes stays true.
+  bool isDownloaded(Episode e) => fileExists(states[e.guid]?.localPath);
 
   Future<bool> download(Episode e) async {
     if (Downloads.i.running(e.guid) || isDownloaded(e)) return true;
@@ -587,6 +664,40 @@ class Podcasts extends ChangeNotifier {
     _persist();
     Downloads.i.settle(job, e.guid, ok);
     return ok;
+  }
+
+  /// The [Downloads] key of a show's "download all".
+  static String batchKey(String feedUrl) => 'show:$feedUrl';
+
+  /// Episodes in [eps] not saved yet.
+  List<Episode> notDownloaded(Iterable<Episode> eps) => eps.where((e) => !isDownloaded(e)).toList();
+
+  /// Saves [eps] one after another (newest first, as given), with overall
+  /// progress under [batchKey]. Cancelling that stops the episode in flight too.
+  /// False if it stopped early.
+  Future<bool> downloadAll(Podcast pod, List<Episode> eps) async {
+    final key = batchKey(pod.feedUrl);
+    final todo = notDownloaded(eps);
+    if (todo.isEmpty || Downloads.i.running(key)) return true;
+    Downloads.i.report(key, 0, label: '${pod.title}: ${todo.length} episodes');
+    var done = 0;
+    var failed = 0;
+    try {
+      for (final e in todo) {
+        if (Downloads.i.cancelled(key)) return false;
+        Downloads.i.joinBatch(e.guid, key);
+        try {
+          if (!await download(e)) failed++;
+        } finally {
+          Downloads.i.leaveBatch(e.guid);
+        }
+        done++;
+        if (!Downloads.i.cancelled(key)) Downloads.i.report(key, done / todo.length);
+      }
+      return failed == 0;
+    } finally {
+      Downloads.i.report(key, null);
+    }
   }
 
   Future<void> removeDownload(Episode e) async {

@@ -13,6 +13,7 @@ import 'marks.dart';
 import 'media_card.dart';
 import 'meta_search.dart';
 import 'quote_card.dart';
+import '../core/image_viewer.dart';
 
 class BookDetail extends StatelessWidget {
   const BookDetail({super.key, required this.book});
@@ -42,7 +43,7 @@ class BookDetail extends StatelessWidget {
 
           return ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 130, child: Hero(tag: 'cover-${book.id}', child: Cover(book))),
+              SizedBox(width: 130, child: ViewableImage(path: book.coverPath, title: book.title, child: Hero(tag: 'cover-${book.id}', child: Cover(book)))),
               const SizedBox(width: 18),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

@@ -22,9 +22,11 @@ import '../services/read_aloud.dart';
 import 'marks.dart';
 import 'media_card.dart';
 import 'meta_search.dart';
+import 'player_parts.dart';
 import 'podcasts_view.dart';
 import 'radio_view.dart';
 import 'reader/reader_screen.dart';
+import '../core/image_viewer.dart';
 
 String fmtClock(Duration d) {
   final s = d.inSeconds.abs();
@@ -35,7 +37,7 @@ String fmtClock(Duration d) {
 /// Plays [b] and opens the full player.
 Future<void> playAudiobook(BuildContext context, Audiobook b, {int? track}) async {
   Player.i.open(b, track: track);
-  await Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
+  await Navigator.of(context).push(PlayerScreen.page());
 }
 
 /// Plays [e] and opens the full player if that's set. On the episode already loaded, this only pauses or resumes.
@@ -44,7 +46,7 @@ Future<void> playEpisode(BuildContext context, Episode e) async {
   // Playing takes it out of the queue, and the row calling this may go with it.
   final nav = Navigator.of(context);
   Podcasts.i.play(e);
-  if (starting && Settings.i.openPlayerOnPlay) await nav.push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
+  if (starting && Settings.i.openPlayerOnPlay) await nav.push(PlayerScreen.page());
 }
 
 /// Plays [s] and opens the full player if that's set. On the station already loaded, this only pauses or resumes.
@@ -52,7 +54,7 @@ Future<void> playStation(BuildContext context, Station s) async {
   final starting = !RadioDirectory.i.isCurrent(s.id);
   final nav = Navigator.of(context);
   RadioDirectory.i.play(s);
-  if (starting && Settings.i.openPlayerOnPlay) await nav.push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen()));
+  if (starting && Settings.i.openPlayerOnPlay) await nav.push(PlayerScreen.page());
 }
 
 /// An audiobook's cover: saved file, then catalogue URL, then a generated one.
@@ -68,8 +70,8 @@ class AudioCover extends StatelessWidget {
     final t = Tokens.of(context);
     final fallback = GeneratedCover(Book(id: book.id, title: book.title, author: book.author, format: BookFormat.epub, path: ''));
     final path = book.coverPath;
-    final Widget img = path != null && File(path).existsSync()
-        ? monoImage(Image.file(File(path), fit: BoxFit.cover, gaplessPlayback: true, errorBuilder: (_, _, _) => fallback))
+    final Widget img = fileExists(path)
+        ? monoImage(SizedFileImage(File(path!), errorBuilder: (_, _, _) => fallback))
         : (book.coverUrl != null ? NetImage(book.coverUrl!, fallback: fallback) : fallback);
     return AspectRatio(
       aspectRatio: 1,
@@ -99,28 +101,27 @@ class AudioCover extends StatelessWidget {
 class PlayerScreen extends StatefulWidget {
   const PlayerScreen({super.key});
 
+  static const route = 'player';
+
+  static Route<void> page() => MaterialPageRoute(fullscreenDialog: true, settings: const RouteSettings(name: route), builder: (_) => const PlayerScreen());
+
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  double? _drag;
-
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     return Scaffold(
       body: SafeArea(
         child: ListenableBuilder(
-          listenable: Player.i,
+          listenable: Listenable.merge([Player.i, Podcasts.i]),
           builder: (context, _) {
             final pl = Player.i;
             final b = pl.book;
             if (b == null) return const Center(child: Label('Nothing playing'));
             final track = pl.current;
-            final dur = pl.duration > Duration.zero ? pl.duration : Duration(milliseconds: track?.ms ?? 0);
-            final pos = _drag != null ? Duration(milliseconds: (_drag! * dur.inMilliseconds).round()) : pl.position;
-            final frac = dur.inMilliseconds == 0 ? 0.0 : (pos.inMilliseconds / dur.inMilliseconds).clamp(0.0, 1.0);
             final left = b.timed ? Duration(milliseconds: ((b.totalMs - b.elapsedMs) / b.speed).round()) : null;
             final w = MediaQuery.of(context).size.width;
 
@@ -129,10 +130,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
             final station = live ? RadioDirectory.i.stationFor(b.sourceKey) : null;
             final episode = podcast ? Podcasts.i.episodeFor(b) : null;
             final text = podcast || live ? null : AudioLibrary.i.bookFor(b);
+            final source = openSourceAction(context, b);
             return ListView(padding: const EdgeInsets.fromLTRB(24, 4, 24, 32), children: [
               Row(children: [
                 IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.keyboard_arrow_down_sharp, size: 28)),
                 Expanded(child: Center(child: Label(live ? 'Live radio' : podcast ? 'Podcast' : (b.streaming ? 'Streaming · ${_sourceName(b)}' : (b.offline ? 'Downloaded' : 'Now playing'))))),
+                IconButton(tooltip: 'Full screen', onPressed: () => openFullScreenPlayer(context), icon: const Icon(Icons.fullscreen_sharp)),
                 IconButton(
                   onPressed: () {
                     if (station != null) {
@@ -147,10 +150,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
                 ),
               ]),
               const SizedBox(height: 12),
-              Center(child: SizedBox(width: math.min(w * .7, 320), child: Hero(tag: 'audio-${b.id}', child: AudioCover(b)))),
+              Center(
+                child: SizedBox(
+                  width: math.min(w * .7, 320),
+                  child: SwipeCover(
+                    key: ValueKey('swipe-${b.id}'),
+                    book: b,
+                    // Swipe to switch; tap to see the art full screen.
+                    onTap: b.coverPath == null && b.coverUrl == null ? null : () => openImageViewer(context, path: b.coverPath, url: b.coverUrl, title: b.title),
+                    child: Hero(tag: 'audio-${b.id}', child: AudioCover(b)),
+                  ),
+                ),
+              ),
               const SizedBox(height: 26),
-              Text(b.title, textAlign: TextAlign.center, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -.3)),
-              if (b.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(b.author, textAlign: TextAlign.center, style: TextStyle(color: t.muted, fontSize: 15))),
+              SourceTitle(book: b, onTap: source),
               const SizedBox(height: 14),
               if (b.tracks.length > 1)
                 GestureDetector(
@@ -172,44 +185,10 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     Label(pl.loading ? 'Connecting' : (pl.playing ? 'Live' : 'Paused'), color: t.ink, weight: FontWeight.w600),
                   ]),
                 )
-              else ...[
-              Slider(
-                value: frac,
-                onChanged: dur == Duration.zero ? null : (v) => setState(() => _drag = v),
-                onChangeEnd: (v) {
-                  pl.seek(Duration(milliseconds: (v * dur.inMilliseconds).round()));
-                  setState(() => _drag = null);
-                },
-              ),
-              Row(children: [
-                Label(fmtClock(pos), color: t.ink),
-                const Spacer(),
-                Label(dur == Duration.zero ? '--:--' : '-${fmtClock(dur - pos)}'),
-              ]),
-              ],
+              else
+                const PlayerScrubber(),
               const SizedBox(height: 18),
-              Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
-                if (!live) _round(context, Icons.skip_previous_sharp, pl.previous, size: 46, enabled: b.tracks.length > 1 || pl.position.inSeconds > 3),
-                if (!live) _round(context, Icons.replay_10_sharp, () => pl.skip(-10), size: 52),
-                GestureDetector(
-                  onTap: () {
-                    haptic(true);
-                    pl.toggle();
-                  },
-                  child: Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(color: t.accent, borderRadius: BorderRadius.circular(t.zen ? 22 : t.radius + 6), boxShadow: [BoxShadow(color: t.accent.withValues(alpha: .3), blurRadius: 18, offset: const Offset(0, 6))]),
-                    child: pl.loading
-                        ? Padding(padding: const EdgeInsets.all(26), child: CircularProgressIndicator(strokeWidth: 2, color: t.onAccent))
-                        : Icon(pl.playing ? Icons.pause_sharp : Icons.play_arrow_sharp, size: 38, color: t.onAccent),
-                  ),
-                ),
-                if (!live) _round(context, Icons.forward_30_sharp, () => pl.skip(30), size: 52),
-                if (!live) podcast
-                    ? _round(context, Icons.skip_next_sharp, () => Podcasts.i.queue.isEmpty ? null : Podcasts.i.play(Podcasts.i.queue.first), size: 46, enabled: Podcasts.i.queue.isNotEmpty)
-                    : _round(context, Icons.skip_next_sharp, pl.next, size: 46, enabled: b.trackIndex < b.tracks.length - 1),
-              ]),
+              const PlayerControls(),
               if (pl.error != null) Padding(padding: const EdgeInsets.only(top: 14), child: Text(pl.error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFE5243B)))),
               const SizedBox(height: 22),
               Row(children: [
@@ -278,20 +257,6 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (at == null) return 'Sleep';
     final left = at.difference(DateTime.now());
     return left.inMinutes >= 1 ? '${left.inMinutes + 1}m' : '${left.inSeconds}s';
-  }
-
-  Widget _round(BuildContext context, IconData i, VoidCallback onTap, {double size = 48, bool enabled = true}) {
-    final t = Tokens.of(context);
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: enabled
-          ? () {
-              haptic();
-              onTap();
-            }
-          : null,
-      child: SizedBox(width: size, height: size, child: Icon(i, size: size * .55, color: enabled ? t.ink : t.line)),
-    );
   }
 
   Widget _chip(BuildContext context, IconData i, String label, VoidCallback onTap, {bool on = false}) {
@@ -375,7 +340,23 @@ class _PlayerScreenState extends State<PlayerScreen> {
       return ListenableBuilder(
         listenable: Listenable.merge([Player.i, Downloads.i, AudioLibrary.i]),
         builder: (ctx, _) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Padding(padding: const EdgeInsets.fromLTRB(20, 4, 20, 8), child: Label('Chapters · ${b.tracks.length}', color: t.accent)),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 8, 4),
+            child: Row(children: [
+              Expanded(child: Label('Chapters · ${b.tracks.length}', color: t.accent)),
+              if (Downloads.i.progress[b.id] case final p?)
+                TextButton.icon(onPressed: () => Downloads.i.cancel(b.id), icon: const Icon(Icons.close_sharp, size: 16), label: Label('${(p * 100).round()}% · Cancel', color: t.ink))
+              else if (b.downloadable)
+                TextButton.icon(
+                  onPressed: () async {
+                    final ok = await AudioLibrary.i.download(b);
+                    if (!ok && !Downloads.i.cancelled(b.id) && ctx.mounted) toast(ctx, 'Download stopped. Tap again to resume.');
+                  },
+                  icon: Icon(Icons.download_sharp, size: 16, color: t.ink),
+                  label: Label('Download all', color: t.ink),
+                ),
+            ]),
+          ),
           Flexible(
             child: ListView.builder(
               shrinkWrap: true,
@@ -782,7 +763,7 @@ class MiniPlayer extends StatelessWidget {
         if (b == null) return const SizedBox.shrink();
         final dur = pl.duration.inMilliseconds;
         return GestureDetector(
-          onTap: () => Navigator.of(context).push(MaterialPageRoute(fullscreenDialog: true, builder: (_) => const PlayerScreen())),
+          onTap: () => Navigator.of(context).push(PlayerScreen.page()),
           child: Container(
             margin: t.zen ? const EdgeInsets.fromLTRB(10, 0, 10, 8) : EdgeInsets.zero,
             clipBehavior: Clip.antiAlias,
@@ -790,7 +771,11 @@ class MiniPlayer extends StatelessWidget {
                 ? BoxDecoration(color: t.surface, borderRadius: BorderRadius.circular(18), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: .12), blurRadius: 18, offset: const Offset(0, 4))])
                 : BoxDecoration(color: t.surface, border: Border(top: BorderSide(color: t.line))),
             child: Column(mainAxisSize: MainAxisSize.min, children: [
-              LinearProgressIndicator(value: dur == 0 ? 0 : (pl.position.inMilliseconds / dur).clamp(0.0, 1.0), minHeight: 2, backgroundColor: Colors.transparent),
+              // Only this line follows every tick; the rest redraws on changes.
+              ListenableBuilder(
+                listenable: pl.ticks,
+                builder: (context, _) => LinearProgressIndicator(value: dur == 0 ? 0 : (pl.position.inMilliseconds / dur).clamp(0.0, 1.0), minHeight: 2, backgroundColor: Colors.transparent),
+              ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(10, 8, 4, 8),
                 child: Row(children: [

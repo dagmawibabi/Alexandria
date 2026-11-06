@@ -28,6 +28,7 @@ import '../quote_card.dart';
 import 'block_view.dart';
 import 'reader_sheets.dart';
 import 'swipe_view.dart';
+import '../../core/skeleton.dart';
 
 enum ReadMode { scroll, swipe, pdf }
 
@@ -94,7 +95,8 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    if (widget.follow != null) Player.i.addListener(_onAudio);
+    // Read-along needs the position as it moves, not every two seconds.
+    if (widget.follow != null) Player.i.ticks.addListener(_onAudio);
     ReadAloud.i.addListener(_onReadAloud);
     for (final l in [Settings.i, Player.i, ReadAloud.i]) {
       l.addListener(_syncVolumeKeys);
@@ -175,7 +177,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    Player.i.removeListener(_onAudio);
+    Player.i.ticks.removeListener(_onAudio);
     ReadAloud.i.removeListener(_onReadAloud);
     for (final l in [Settings.i, Player.i, ReadAloud.i]) {
       l.removeListener(_syncVolumeKeys);
@@ -937,11 +939,18 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     }
     final d = _doc;
     if (d == null) {
-      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-        SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 1.5, color: Settings.i.signalOn(style.surface.fg))),
-        const SizedBox(height: 14),
-        Text('PARSING ${book.formatLabel}', style: monoFont(color: style.muted, fontSize: 10, letterSpacing: 1.4)),
-      ]));
+      // The page's shape in its own colours while the book is read in.
+      return SafeArea(
+        child: SingleChildScrollView(
+          physics: const NeverScrollableScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(style.margin, 56, style.margin, 0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('OPENING ${book.formatLabel}', style: monoFont(color: style.muted, fontSize: 10, letterSpacing: 1.4)),
+            const SizedBox(height: 22),
+            SkeletonText(lines: 6, paragraphs: 4, lineHeight: (style.body.fontSize ?? 17) * .62, gap: (style.body.fontSize ?? 17) * .78, color: style.muted.withValues(alpha: .22)),
+          ]),
+        ),
+      );
     }
 
     switch (_mode) {

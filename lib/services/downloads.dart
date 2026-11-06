@@ -21,6 +21,9 @@ class Downloads extends ChangeNotifier {
   /// What each running job is, for the notification and the downloads page.
   final Map<String, String> labels = {};
 
+  /// Bytes, speed and retries of each running single-file job, for the downloads page.
+  final Map<String, DownloadStat> stats = {};
+
   static const _channel = MethodChannel('alexandria/downloads');
   bool _handlerSet = false;
   DateTime _lastPush = DateTime(0);
@@ -63,6 +66,15 @@ class Downloads extends ChangeNotifier {
 
   bool cancelled(String key) => _cancelled.contains(key);
 
+  /// Jobs run as part of a batch: cancelling the batch cancels them too.
+  final Map<String, String> _batchOf = {};
+
+  void joinBatch(String key, String batch) => _batchOf[key] = batch;
+
+  void leaveBatch(String key) => _batchOf.remove(key);
+
+  bool _stopped(String key) => _cancelled.contains(key) || (_batchOf[key] != null && _cancelled.contains(_batchOf[key]));
+
   /// For jobs made of several files: report overall progress under [key].
   void report(String key, double? v, {String? label}) {
     final starting = v != null && !progress.containsKey(key);
@@ -70,6 +82,7 @@ class Downloads extends ChangeNotifier {
     if (v == null) {
       progress.remove(key);
       labels.remove(key);
+      stats.remove(key);
     } else {
       if (starting) _cancelled.remove(key);
       progress[key] = v;
@@ -109,7 +122,11 @@ class Downloads extends ChangeNotifier {
       await part.parent.create(recursive: true);
       for (var attempt = 0; attempt < _attempts; attempt++) {
         if (attempt > 0) await Future.delayed(retryDelay);
-        if (_cancelled.contains(stop)) break;
+        if (_stopped(stop)) break;
+        if (attempt > 0) {
+          (stats[key] ??= DownloadStat()).attempt = attempt + 1;
+          notifyListeners();
+        }
         final result = await _attempt(key, url, part, tag, stop, onProgress);
         if (result == _Attempt.done) {
           await part.rename(dest);
@@ -123,11 +140,12 @@ class Downloads extends ChangeNotifier {
         }
         if (result == _Attempt.cancelled) break;
       }
-      if (_cancelled.contains(stop)) await discard();
+      if (_stopped(stop)) await discard();
       return false;
     } catch (_) {
       return false;
     } finally {
+      stats.remove(key);
       if (onProgress == null) report(key, null);
     }
   }
@@ -172,10 +190,14 @@ class Downloads extends ChangeNotifier {
       sink = part.openWrite(mode: have > 0 ? FileMode.append : FileMode.write);
       var got = have;
       var last = -1.0;
+      final stat = (stats[key] ??= DownloadStat())
+        ..got = have
+        ..total = total;
       await for (final chunk in res.stream.timeout(const Duration(seconds: 45))) {
-        if (_cancelled.contains(stop)) return _Attempt.cancelled;
+        if (_stopped(stop)) return _Attempt.cancelled;
         sink.add(chunk);
         got += chunk.length;
+        stat.add(got);
         final v = total > 0 ? got / total : -1.0;
         if (v < 0 || v - last >= .01) {
           last = v;
@@ -211,3 +233,41 @@ class Downloads extends ChangeNotifier {
 }
 
 enum _Attempt { done, retry, gone, cancelled }
+
+/// How one file's download is going.
+class DownloadStat {
+  int got = 0;
+
+  /// 0 while the size is unknown.
+  int total = 0;
+
+  /// Bytes a second, smoothed so the figure doesn't jump about.
+  double rate = 0;
+
+  /// 1 on the first try; higher after a dropped connection.
+  int attempt = 1;
+
+  int _lastBytes = 0;
+  DateTime? _lastAt;
+
+  void add(int bytes) {
+    final now = DateTime.now();
+    final at = _lastAt;
+    got = bytes;
+    if (at == null) {
+      _lastAt = now;
+      _lastBytes = bytes;
+      return;
+    }
+    final ms = now.difference(at).inMilliseconds;
+    // Sampled every half second: chunks arrive far too often to time one by one.
+    if (ms < 500) return;
+    final r = (bytes - _lastBytes) * 1000 / ms;
+    rate = rate == 0 ? r : rate * .7 + r * .3;
+    _lastAt = now;
+    _lastBytes = bytes;
+  }
+
+  /// Time left at the current speed, or null when it can't be told.
+  Duration? get left => total > 0 && rate > 1 ? Duration(seconds: ((total - got) / rate).round()) : null;
+}
