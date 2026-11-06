@@ -62,6 +62,11 @@ class MainActivity : AudioServiceActivity() {
                     readAloudLock?.let { if (it.isHeld) it.release() }
                     result.success(null)
                 }
+                // Playback started: the notification and lock-screen controls need this on Android 13+.
+                "askNotifications" -> {
+                    askForNotifications()
+                    result.success(null)
+                }
                 else -> result.notImplemented()
             }
         }

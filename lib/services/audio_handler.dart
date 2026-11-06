@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'audio.dart';
 import 'read_aloud.dart';
@@ -36,8 +37,18 @@ class AlexandriaAudioHandler extends BaseAudioHandler with SeekHandler {
 
   String _itemKey = '';
   String _stateKey = '';
+  bool _askedForNotifications = false;
+
+  /// Android 13+ hides the playback notification (and with it the lock-screen
+  /// controls) until notifications are allowed, so ask the first time anything plays.
+  void _askForNotifications() {
+    if (_askedForNotifications || !Platform.isAndroid) return;
+    _askedForNotifications = true;
+    const MethodChannel('alexandria/power').invokeMethod('askNotifications').catchError((_) => null).ignore();
+  }
 
   void _sync() {
+    if (Player.i.playing || ReadAloud.i.playing) _askForNotifications();
     if (ReadAloud.i.active) return _syncRead();
     final pl = Player.i;
     final b = pl.book;
