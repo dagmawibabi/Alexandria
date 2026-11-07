@@ -1,10 +1,14 @@
 package com.example.alexandria
 
 import android.Manifest
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.PowerManager
 import android.provider.OpenableColumns
 import android.view.KeyEvent
@@ -27,6 +31,35 @@ class MainActivity : AudioServiceActivity() {
     private var readAloudLock: PowerManager.WakeLock? = null
     private var volumeKeys: MethodChannel? = null
     private var pagingWithVolume = false
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        createPlayerChannel()
+        super.onCreate(savedInstanceState)
+    }
+
+    // audio_service would create a low-importance ("silent") channel, which many
+    // phones hide on the lock screen. Creating it first, at default importance but
+    // with no sound, keeps the player on the lock screen without ever making a noise.
+    // Must match androidNotificationChannelId in audio_handler.dart.
+    private fun createPlayerChannel() {
+        if (Build.VERSION.SDK_INT < 26) return
+        val manager = getSystemService(NotificationManager::class.java) ?: return
+        manager.deleteNotificationChannel("com.example.alexandria.playback")
+        if (manager.getNotificationChannel(PLAYER_CHANNEL) != null) return
+        val channel = NotificationChannel(PLAYER_CHANNEL, "Now playing", NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = "Player controls in the notification shade and on the lock screen"
+            setSound(null, null)
+            enableVibration(false)
+            enableLights(false)
+            setShowBadge(false)
+            lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+        }
+        manager.createNotificationChannel(channel)
+    }
+
+    companion object {
+        const val PLAYER_CHANNEL = "alexandria.player"
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)

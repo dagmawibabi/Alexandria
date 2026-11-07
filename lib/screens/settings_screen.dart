@@ -234,6 +234,95 @@ class _PlayerAndPodcasts extends StatelessWidget {
       const _EpisodeOrder(),
       heading('New-episode alerts'),
       const _PodcastAlerts(),
+      heading('Move your shows'),
+      const _Opml(),
+    ]);
+  }
+}
+
+/// Subscriptions in and out as OPML, to and from other podcast apps.
+class _Opml extends StatefulWidget {
+  const _Opml();
+
+  @override
+  State<_Opml> createState() => _OpmlState();
+}
+
+class _OpmlState extends State<_Opml> {
+  bool _busy = false;
+  String? _progress;
+  String? _result;
+
+  Future<void> _export() async {
+    if (Podcasts.i.subscriptions.isEmpty) return toast(context, 'You aren\'t subscribed to any shows yet');
+    setState(() => _busy = true);
+    try {
+      final dir = await getTemporaryDirectory();
+      final f = File(p.join(dir.path, 'alexandria-podcasts.opml'));
+      await f.writeAsString(Podcasts.i.toOpml());
+      await SharePlus.instance.share(ShareParams(files: [XFile(f.path, mimeType: 'text/x-opml')], subject: 'Podcast subscriptions'));
+    } catch (e) {
+      if (mounted) toast(context, '$e');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _import() async {
+    // Any file type: Android's picker doesn't recognise .opml.
+    final files = await FilePicker.pickFiles(dialogTitle: 'Choose an OPML file');
+    final path = files.firstOrNull?.path;
+    if (path == null || !mounted) return;
+    setState(() {
+      _busy = true;
+      _result = null;
+      _progress = null;
+    });
+    try {
+      final feeds = Podcasts.parseOpml(await File(path).readAsString());
+      if (feeds.isEmpty) throw const FormatException('No podcast feeds in that file.');
+      final r = await Podcasts.i.importOpml(feeds, onProgress: (done, total) {
+        if (mounted && total > 0) setState(() => _progress = 'Reading feeds… $done of $total');
+      });
+      if (!mounted) return;
+      setState(() {
+        _result = [
+          r.added == 0 ? 'No new shows added.' : 'Subscribed to ${r.added} show${r.added == 1 ? '' : 's'}.',
+          if (r.already > 0) '${r.already} ${r.already == 1 ? 'was' : 'were'} already in your shows.',
+          if (r.failed.isNotEmpty) 'Couldn\'t read ${r.failed.length == 1 ? 'this feed' : 'these ${r.failed.length} feeds'}: ${r.failed.join(', ')}. Check your connection and import again; shows already added are skipped.',
+        ].join('\n\n');
+      });
+    } on FormatException catch (e) {
+      if (mounted) setState(() => _result = e.message);
+    } catch (e) {
+      if (mounted) setState(() => _result = '$e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busy = false;
+          _progress = null;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text('Bring your subscriptions from another podcast app, or take them with you, as an OPML file.', style: TextStyle(color: t.muted, height: 1.4)),
+      const SizedBox(height: 14),
+      PrimaryButton('Import OPML', icon: Icons.file_open_outlined, expand: true, onTap: _busy ? null : _import),
+      const SizedBox(height: 8),
+      PrimaryButton('Export OPML', ghost: true, icon: Icons.ios_share_sharp, expand: true, onTap: _busy ? null : _export),
+      if (_busy) ...[
+        const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+        if (_progress != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_progress!, style: TextStyle(color: t.muted, fontSize: 13))),
+      ],
+      if (_result != null) ...[
+        const SizedBox(height: 14),
+        Panel(padding: const EdgeInsets.all(14), child: Text(_result!, style: const TextStyle(height: 1.45))),
+      ],
     ]);
   }
 }

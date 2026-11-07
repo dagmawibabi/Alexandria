@@ -21,8 +21,9 @@ class AlexandriaAudioHandler extends BaseAudioHandler with SeekHandler {
       await AudioService.init(
         builder: AlexandriaAudioHandler.new,
         config: const AudioServiceConfig(
-          androidNotificationChannelId: 'com.example.alexandria.playback',
-          androidNotificationChannelName: 'Playback',
+          // MainActivity creates this channel first, so it shows on the lock screen.
+          androidNotificationChannelId: 'alexandria.player',
+          androidNotificationChannelName: 'Now playing',
           androidNotificationChannelDescription: 'Audiobook and podcast controls',
           androidNotificationIcon: 'drawable/ic_launcher_monochrome',
           androidStopForegroundOnPause: true,

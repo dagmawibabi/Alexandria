@@ -422,6 +422,97 @@ class Podcasts extends ChangeNotifier {
     return pod;
   }
 
+  // ---------------- OPML ----------------
+
+  /// Subscriptions as an OPML file, the format every podcast app imports.
+  String toOpml() {
+    final b = XmlBuilder();
+    b.processing('xml', 'version="1.0" encoding="UTF-8"');
+    b.element('opml', attributes: {'version': '2.0'}, nest: () {
+      b.element('head', nest: () {
+        b.element('title', nest: 'Alexandria podcast subscriptions');
+        b.element('dateCreated', nest: HttpDate.format(DateTime.now()));
+      });
+      b.element('body', nest: () {
+        for (final s in subscriptions) {
+          b.element('outline', attributes: {
+            'type': 'rss',
+            'text': s.title,
+            'title': s.title,
+            'xmlUrl': s.feedUrl,
+            if (s.link != null && s.link!.isNotEmpty) 'htmlUrl': s.link!,
+            if (s.imageUrl != null && s.imageUrl!.isNotEmpty) 'imageUrl': s.imageUrl!,
+          });
+        }
+      });
+    });
+    return b.buildDocument().toXmlString(pretty: true, indent: '  ');
+  }
+
+  /// The feeds listed in an OPML file, in order, as (title, feed address).
+  /// Throws a [FormatException] if it isn't OPML.
+  static List<({String title, String url})> parseOpml(String text) {
+    final XmlDocument doc;
+    try {
+      doc = XmlDocument.parse(text.trimLeft().replaceFirst('﻿', ''));
+    } on XmlException {
+      throw const FormatException('That file isn\'t OPML.');
+    }
+    if (doc.rootElement.name.local.toLowerCase() != 'opml') throw const FormatException('That file isn\'t OPML.');
+    String? attr(XmlElement e, String name) {
+      for (final a in e.attributes) {
+        if (a.name.local.toLowerCase() == name.toLowerCase()) return a.value.trim();
+      }
+      return null;
+    }
+
+    final seen = <String>{};
+    final out = <({String title, String url})>[];
+    // Folders nest outlines inside outlines, so take every one with a feed.
+    for (final o in doc.findAllElements('outline')) {
+      final url = attr(o, 'xmlUrl');
+      if (url == null || !url.startsWith('http') || !seen.add(url)) continue;
+      final title = attr(o, 'title') ?? attr(o, 'text') ?? '';
+      out.add((title: title.isEmpty ? url : title, url: url));
+    }
+    return out;
+  }
+
+  /// Subscribes to every feed in [feeds] not already followed, a few at a time.
+  /// Returns how many were added, and the titles of feeds that couldn't be read.
+  Future<({int added, int already, List<String> failed})> importOpml(
+    List<({String title, String url})> feeds, {
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final todo = feeds.where((f) => !subscribed(f.url)).toList();
+    final already = feeds.length - todo.length;
+    final found = List<Podcast?>.filled(todo.length, null);
+    var done = 0;
+    onProgress?.call(0, todo.length);
+    for (var n = 0; n < todo.length; n += 4) {
+      await Future.wait([
+        for (var k = n; k < math.min(n + 4, todo.length); k++)
+          ApiCache.fresh(() => feed(todo[k].url, refresh: true)).catchError((_) => null).then((pod) {
+            found[k] = pod;
+            onProgress?.call(++done, todo.length);
+          }),
+      ]);
+    }
+    // subscribe() puts each show first; going backwards keeps the file's order.
+    var added = 0;
+    final failed = <String>[];
+    for (var k = todo.length - 1; k >= 0; k--) {
+      final pod = found[k];
+      if (pod == null || pod.episodes.isEmpty) {
+        failed.insert(0, todo[k].title);
+      } else if (!subscribed(pod.feedUrl)) {
+        subscribe(pod);
+        added++;
+      }
+    }
+    return (added: added, already: already, failed: failed);
+  }
+
   /// Re-reads every subscribed feed.
   Future<void> refreshAll() async {
     if (refreshing || subscriptions.isEmpty) return;
