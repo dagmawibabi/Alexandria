@@ -13,11 +13,14 @@ enum AddedKind { book, audio, show }
 
 /// What was added in the last month, newest first. Takes no room when there's none.
 class RecentlyAdded extends StatelessWidget {
-  const RecentlyAdded({super.key, this.kinds = const {AddedKind.book, AddedKind.audio, AddedKind.show}});
+  const RecentlyAdded({super.key, this.kinds = const {AddedKind.book, AddedKind.audio, AddedKind.show}, this.onSeeAll});
 
   final Set<AddedKind> kinds;
 
-  static const _window = Duration(days: 30);
+  /// Shows a "See all" button on the header that calls this.
+  final void Function(BuildContext context)? onSeeAll;
+
+  static const window = Duration(days: 30);
   static const _width = 96.0;
 
   @override
@@ -27,7 +30,7 @@ class RecentlyAdded extends StatelessWidget {
   }
 
   Widget _rail(BuildContext context) {
-    final since = DateTime.now().subtract(_window);
+    final since = DateTime.now().subtract(window);
     final items = <(DateTime, Widget)>[
       if (kinds.contains(AddedKind.book))
         for (final b in Library.i.books.where((b) => b.addedAt.isAfter(since)))
@@ -69,7 +72,12 @@ class RecentlyAdded extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     final scale = MediaQuery.textScalerOf(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const SectionHeader('', 'Recently added', padding: EdgeInsets.fromLTRB(20, 18, 20, 10)),
+      SectionHeader(
+        '',
+        'Recently added',
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 10),
+        trailing: onSeeAll == null ? null : SeeAll(onTap: () => onSeeAll!(context)),
+      ),
       SizedBox(
         height: _width * 1.5 + 6 + scale.scale(32) + 4 + scale.scale(14),
         child: ListView.separated(

@@ -165,7 +165,8 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
             child: CustomScrollView(physics: const AlwaysScrollableScrollPhysics(), slivers: [
               SliverToBoxAdapter(child: _header(context)),
               if (_tab == 'radio') RadioPane(key: _radio) else if (searchMode) ..._searchResults(context) else ...[
-                const SliverToBoxAdapter(child: RecentlyAdded(kinds: {AddedKind.show})),
+                const SliverToBoxAdapter(child: OpmlProgress(padding: EdgeInsets.fromLTRB(20, 14, 20, 0))),
+                SliverToBoxAdapter(child: RecentlyAdded(kinds: const {AddedKind.show}, onSeeAll: (c) => openShows(c, recent: true))),
                 ..._shows(context),
                 ..._exploreSection(context),
               ],
@@ -244,7 +245,10 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
           '',
           'Your shows · ${pods.subscriptions.length}',
           padding: const EdgeInsets.fromLTRB(20, 22, 20, 8),
-          trailing: pods.refreshing ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)) : null,
+          trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+            if (pods.refreshing) ...[const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)), const SizedBox(width: 10)],
+            SeeAll(onTap: () => openShows(context, favourites: _shelf == 'fav')),
+          ]),
         ),
       ),
       SliverToBoxAdapter(
@@ -391,6 +395,156 @@ class ShowTile extends StatelessWidget {
           const SizedBox(height: 6),
           Text(show.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, height: 1.15)),
         ]),
+      ),
+    );
+  }
+}
+
+/// An OPML import's progress with a Cancel button, then its summary until
+/// dismissed. Takes no room when there's no import.
+class OpmlProgress extends StatelessWidget {
+  const OpmlProgress({super.key, this.padding = EdgeInsets.zero});
+  final EdgeInsets padding;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Podcasts.i,
+      builder: (context, _) {
+        final job = Podcasts.i.opml;
+        if (job == null) return const SizedBox.shrink();
+        final t = Tokens.of(context);
+        final summary = [
+          if (job.running && job.cancelled) 'Stopping…'
+          else if (job.running) 'Importing shows… ${job.done} of ${job.total}'
+          else job.added == 0 ? 'No new shows added.' : 'Subscribed to ${job.added} show${job.added == 1 ? '' : 's'}.',
+          if (!job.running && job.cancelled && job.skipped > 0) 'Cancelled: ${job.skipped} not imported. Import the file again to add them; shows already added are skipped.',
+          if (job.running && job.added > 0) '${job.added} added so far. They’re in your shows now, even if you cancel.',
+          if (job.already > 0) '${job.already} ${job.already == 1 ? 'was' : 'were'} already in your shows.',
+          if (job.failed.isNotEmpty) 'Couldn’t read ${job.failed.length == 1 ? 'this feed' : 'these ${job.failed.length} feeds'}: ${job.failed.join(', ')}.',
+        ];
+        return Padding(
+          padding: padding,
+          child: Panel(
+            padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(summary.first, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                if (job.running)
+                  TextButton(onPressed: job.cancelled ? null : Podcasts.i.cancelOpmlImport, child: const Text('Cancel'))
+                else
+                  IconButton(tooltip: 'Dismiss', visualDensity: VisualDensity.compact, icon: const Icon(Icons.close_sharp, size: 18), onPressed: Podcasts.i.dismissOpmlImport),
+              ]),
+              if (job.running) ...[
+                const SizedBox(height: 8),
+                Padding(padding: const EdgeInsets.only(right: 6), child: LinearProgressIndicator(value: job.total == 0 ? null : job.done / job.total)),
+              ],
+              for (final line in summary.skip(1)) Padding(padding: const EdgeInsets.only(top: 8, right: 6), child: Text(line, style: TextStyle(color: t.muted, fontSize: 13, height: 1.4))),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+void openShows(BuildContext context, {bool recent = false, bool favourites = false}) {
+  Navigator.of(context).push(MaterialPageRoute(builder: (_) => ShowsScreen(shelf: recent ? 'recent' : (favourites ? 'fav' : 'all'))));
+}
+
+/// Every subscribed show on one page, as a grid: all, favourites or recently added.
+class ShowsScreen extends StatefulWidget {
+  const ShowsScreen({super.key, this.shelf = 'all'});
+  final String shelf;
+
+  @override
+  State<ShowsScreen> createState() => _ShowsScreenState();
+}
+
+class _ShowsScreenState extends State<ShowsScreen> {
+  late String _shelf = widget.shelf;
+  // Recently added reads newest first; the full list starts in your own order.
+  late String _sort = widget.shelf == 'recent' ? 'added' : 'yours';
+
+  List<Podcast> _shows() {
+    final pods = Podcasts.i;
+    final since = DateTime.now().subtract(RecentlyAdded.window);
+    final list = pods.subscriptions.where((x) {
+      if (_shelf == 'fav') return pods.showMark(x.feedUrl).favorite;
+      if (_shelf == 'recent') return x.subscribedAt?.isAfter(since) ?? false;
+      return true;
+    }).toList();
+    if (_sort == 'az') list.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    if (_sort == 'added') list.sort((a, b) => (b.subscribedAt ?? DateTime(1970)).compareTo(a.subscribedAt ?? DateTime(1970)));
+    return list;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = Tokens.of(context);
+    return Scaffold(
+      appBar: AppBar(title: AppTitle(_shelf == 'recent' ? 'Recently added' : 'Your shows')),
+      bottomNavigationBar: const PagePlayer(),
+      body: ListenableBuilder(
+        listenable: Podcasts.i,
+        builder: (context, _) {
+          final shows = _shows();
+          Widget chip(String label, String value) => Padding(padding: const EdgeInsets.only(right: 6), child: Tag(label, filled: _shelf == value, onTap: () => setState(() => _shelf = value)));
+          return CustomScrollView(slivers: [
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 36,
+                child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 20), children: [
+                  chip('All · ${Podcasts.i.subscriptions.length}', 'all'),
+                  chip('★ Favourites', 'fav'),
+                  chip('Recently added', 'recent'),
+                ]),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+                // Segmented stretches its segments, so it needs a full-width line, not a Row.
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Segmented<String>(values: const ['yours', 'added', 'az'], labels: const ['Your order', 'Newest', 'A–Z'], value: _sort, onChanged: (v) => setState(() => _sort = v)),
+                  const SizedBox(height: 12),
+                  Label('${shows.length} show${shows.length == 1 ? '' : 's'}', size: 9),
+                ]),
+              ),
+            ),
+            if (shows.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(40),
+                  child: Center(
+                    child: Text(
+                      _shelf == 'fav' ? 'No favourites yet. Hold a show to favourite it.' : (_shelf == 'recent' ? 'Nothing subscribed in the last month.' : 'You aren’t subscribed to any shows yet.'),
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: t.muted),
+                    ),
+                  ),
+                ),
+              )
+            else
+              // A box LayoutBuilder, not SliverLayoutBuilder: that one trips a
+              // Flutter semantics assertion ('!semantics.parentDataDirty').
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+                  child: LayoutBuilder(builder: (context, c) {
+                    final cols = (c.maxWidth / 120).floor().clamp(3, 8);
+                    final w = (c.maxWidth - 12 * (cols - 1)) / cols;
+                    return Wrap(spacing: 12, runSpacing: 16, children: [for (final s in shows) ShowTile(key: ValueKey(s.feedUrl), show: s, width: w)]);
+                  }),
+                ),
+              ),
+          ]);
+        },
       ),
     );
   }

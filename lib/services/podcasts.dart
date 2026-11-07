@@ -71,6 +71,22 @@ String _plain(String s) => (html.parseFragment(s).text ?? '').replaceAll(RegExp(
 /// isolate must be handed a plain function, nothing tied to the Podcasts class.
 Podcast? _parseFeedInIsolate((String, String) a) => Podcasts.parseFeed(a.$1, a.$2);
 
+/// Progress of an OPML import. [total] counts only shows not already followed.
+class OpmlImport {
+  OpmlImport({required this.total, required this.already});
+
+  final int total;
+  final int already;
+  int done = 0;
+  int added = 0;
+  final List<String> failed = [];
+  bool running = true;
+  bool cancelled = false;
+
+  /// Shows never reached because the import was cancelled.
+  int get skipped => total - done;
+}
+
 /// Subscriptions, listening history, the queue and downloaded episodes.
 class Podcasts extends ChangeNotifier {
   Podcasts._();
@@ -398,10 +414,11 @@ class Podcasts extends ChangeNotifier {
 
   bool subscribed(String feedUrl) => subscriptions.any((s) => s.feedUrl == feedUrl);
 
-  void subscribe(Podcast pod) {
+  /// Adds [pod] first in your shows, or at [at].
+  void subscribe(Podcast pod, {int at = 0}) {
     if (subscribed(pod.feedUrl)) return;
     pod.subscribedAt = DateTime.now();
-    subscriptions.insert(0, pod);
+    subscriptions.insert(at.clamp(0, subscriptions.length), pod);
     _feeds[pod.feedUrl] = pod;
     _persist();
   }
@@ -478,39 +495,62 @@ class Podcasts extends ChangeNotifier {
     return out;
   }
 
-  /// Subscribes to every feed in [feeds] not already followed, a few at a time.
-  /// Returns how many were added, and the titles of feeds that couldn't be read.
-  Future<({int added, int already, List<String> failed})> importOpml(
-    List<({String title, String url})> feeds, {
-    void Function(int done, int total)? onProgress,
-  }) async {
+  /// The OPML import running now, or the last one until it's dismissed.
+  /// It lives here rather than on a page, so it carries on wherever you go.
+  OpmlImport? opml;
+
+  /// Starts subscribing to every feed in [feeds] not already followed, a few at
+  /// a time. Each show is subscribed as soon as its feed is read, so a cancelled
+  /// or interrupted import keeps everything it got to.
+  void startOpmlImport(List<({String title, String url})> feeds) {
+    if (opml?.running ?? false) return;
     final todo = feeds.where((f) => !subscribed(f.url)).toList();
-    final already = feeds.length - todo.length;
-    final found = List<Podcast?>.filled(todo.length, null);
-    var done = 0;
-    onProgress?.call(0, todo.length);
-    for (var n = 0; n < todo.length; n += 4) {
-      await Future.wait([
-        for (var k = n; k < math.min(n + 4, todo.length); k++)
-          ApiCache.fresh(() => feed(todo[k].url, refresh: true)).catchError((_) => null).then((pod) {
-            found[k] = pod;
-            onProgress?.call(++done, todo.length);
-          }),
-      ]);
-    }
-    // subscribe() puts each show first; going backwards keeps the file's order.
-    var added = 0;
-    final failed = <String>[];
-    for (var k = todo.length - 1; k >= 0; k--) {
-      final pod = found[k];
-      if (pod == null || pod.episodes.isEmpty) {
-        failed.insert(0, todo[k].title);
-      } else if (!subscribed(pod.feedUrl)) {
-        subscribe(pod);
-        added++;
+    final job = opml = OpmlImport(total: todo.length, already: feeds.length - todo.length);
+    notifyListeners();
+    _runOpml(job, todo).whenComplete(() {
+      job.running = false;
+      notifyListeners();
+    }).ignore();
+  }
+
+  void cancelOpmlImport() {
+    final job = opml;
+    if (job == null || !job.running) return;
+    job.cancelled = true;
+    notifyListeners();
+  }
+
+  /// Clears the finished import's summary.
+  void dismissOpmlImport() {
+    if (opml?.running ?? false) return;
+    opml = null;
+    notifyListeners();
+  }
+
+  Future<void> _runOpml(OpmlImport job, List<({String title, String url})> todo) async {
+    var next = 0;
+    // File positions of the shows added so far, in order: each new show goes in
+    // among them by its own position, so your list follows the file's order.
+    final placed = <int>[];
+    Future<void> worker() async {
+      while (!job.cancelled && next < todo.length) {
+        final k = next++;
+        final pod = await ApiCache.fresh(() => feed(todo[k].url, refresh: true)).catchError((_) => null);
+        if (job.cancelled) return;
+        job.done++;
+        if (pod == null || pod.episodes.isEmpty) {
+          job.failed.add(todo[k].title);
+        } else if (!subscribed(pod.feedUrl)) {
+          final at = placed.where((p) => p < k).length;
+          placed.insert(at, k);
+          subscribe(pod, at: at);
+          job.added++;
+        }
+        notifyListeners();
       }
     }
-    return (added: added, already: already, failed: failed);
+
+    await Future.wait([for (var w = 0; w < math.min(4, todo.length); w++) worker()]);
   }
 
   /// Re-reads every subscribed feed.

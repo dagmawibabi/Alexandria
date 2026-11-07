@@ -18,6 +18,7 @@ import '../services/podcasts.dart';
 import '../services/speech.dart';
 import 'ai_sheets.dart';
 import 'listen_sheet.dart';
+import 'podcasts_view.dart' show OpmlProgress;
 import 'reader/reader_sheets.dart';
 import 'stats_screen.dart';
 import 'widgets_screen.dart';
@@ -250,11 +251,10 @@ class _Opml extends StatefulWidget {
 
 class _OpmlState extends State<_Opml> {
   bool _busy = false;
-  String? _progress;
-  String? _result;
+  String? _error;
 
   Future<void> _export() async {
-    if (Podcasts.i.subscriptions.isEmpty) return toast(context, 'You aren\'t subscribed to any shows yet');
+    if (Podcasts.i.subscriptions.isEmpty) return toast(context, 'You aren’t subscribed to any shows yet');
     setState(() => _busy = true);
     try {
       final dir = await getTemporaryDirectory();
@@ -273,57 +273,41 @@ class _OpmlState extends State<_Opml> {
     final files = await FilePicker.pickFiles(dialogTitle: 'Choose an OPML file');
     final path = files.firstOrNull?.path;
     if (path == null || !mounted) return;
-    setState(() {
-      _busy = true;
-      _result = null;
-      _progress = null;
-    });
+    setState(() => _error = null);
     try {
       final feeds = Podcasts.parseOpml(await File(path).readAsString());
       if (feeds.isEmpty) throw const FormatException('No podcast feeds in that file.');
-      final r = await Podcasts.i.importOpml(feeds, onProgress: (done, total) {
-        if (mounted && total > 0) setState(() => _progress = 'Reading feeds… $done of $total');
-      });
-      if (!mounted) return;
-      setState(() {
-        _result = [
-          r.added == 0 ? 'No new shows added.' : 'Subscribed to ${r.added} show${r.added == 1 ? '' : 's'}.',
-          if (r.already > 0) '${r.already} ${r.already == 1 ? 'was' : 'were'} already in your shows.',
-          if (r.failed.isNotEmpty) 'Couldn\'t read ${r.failed.length == 1 ? 'this feed' : 'these ${r.failed.length} feeds'}: ${r.failed.join(', ')}. Check your connection and import again; shows already added are skipped.',
-        ].join('\n\n');
-      });
+      // Runs in the podcasts service: you can leave this page while it works.
+      Podcasts.i.startOpmlImport(feeds);
     } on FormatException catch (e) {
-      if (mounted) setState(() => _result = e.message);
+      if (mounted) setState(() => _error = e.message);
     } catch (e) {
-      if (mounted) setState(() => _result = '$e');
-    } finally {
-      if (mounted) {
-        setState(() {
-          _busy = false;
-          _progress = null;
-        });
-      }
+      if (mounted) setState(() => _error = '$e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text('Bring your subscriptions from another podcast app, or take them with you, as an OPML file.', style: TextStyle(color: t.muted, height: 1.4)),
-      const SizedBox(height: 14),
-      PrimaryButton('Import OPML', icon: Icons.file_open_outlined, expand: true, onTap: _busy ? null : _import),
-      const SizedBox(height: 8),
-      PrimaryButton('Export OPML', ghost: true, icon: Icons.ios_share_sharp, expand: true, onTap: _busy ? null : _export),
-      if (_busy) ...[
-        const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
-        if (_progress != null) Padding(padding: const EdgeInsets.only(top: 8), child: Text(_progress!, style: TextStyle(color: t.muted, fontSize: 13))),
-      ],
-      if (_result != null) ...[
-        const SizedBox(height: 14),
-        Panel(padding: const EdgeInsets.all(14), child: Text(_result!, style: const TextStyle(height: 1.45))),
-      ],
-    ]);
+    return ListenableBuilder(
+      listenable: Podcasts.i,
+      builder: (context, _) {
+        final running = Podcasts.i.opml?.running ?? false;
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Bring your subscriptions from another podcast app, or take them with you, as an OPML file.', style: TextStyle(color: t.muted, height: 1.4)),
+          const SizedBox(height: 14),
+          PrimaryButton(running ? 'Importing…' : 'Import OPML', icon: Icons.file_open_outlined, expand: true, onTap: running ? null : _import),
+          const SizedBox(height: 8),
+          PrimaryButton('Export OPML', ghost: true, icon: Icons.ios_share_sharp, expand: true, onTap: _busy ? null : _export),
+          if (_busy) const Padding(padding: EdgeInsets.only(top: 12), child: LinearProgressIndicator()),
+          if (_error != null) ...[
+            const SizedBox(height: 14),
+            Panel(padding: const EdgeInsets.all(14), child: Text(_error!, style: const TextStyle(height: 1.45))),
+          ],
+          const OpmlProgress(padding: EdgeInsets.only(top: 14)),
+        ]);
+      },
+    );
   }
 }
 

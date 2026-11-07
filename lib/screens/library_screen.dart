@@ -574,7 +574,7 @@ class _StripHeader extends StatelessWidget {
       '',
       '$title · $count',
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-      trailing: GestureDetector(onTap: () => shellTab.value = tab, child: Label('See all', color: Tokens.of(context).accent, weight: FontWeight.w600)),
+      trailing: SeeAll(onTap: () => shellTab.value = tab),
     );
   }
 }

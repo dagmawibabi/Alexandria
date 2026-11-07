@@ -93,6 +93,19 @@ class Pip extends StatelessWidget {
 }
 
 /// "01 — LIBRARY ............ trailing"
+/// The "See all" link on a section header, with a generous tap area.
+class SeeAll extends StatelessWidget {
+  const SeeAll({super.key, required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Label('See all', color: Tokens.of(context).accent, weight: FontWeight.w600)),
+      );
+}
+
 class SectionHeader extends StatelessWidget {
   const SectionHeader(this.index, this.title, {super.key, this.trailing, this.padding = const EdgeInsets.fromLTRB(20, 24, 20, 10)});
 
