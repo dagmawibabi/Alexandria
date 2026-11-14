@@ -146,7 +146,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                       separatorBuilder: (_, _) => const SizedBox(width: 12),
                       itemBuilder: (_, i) {
                         final s = shown[i];
-                        return GestureDetector(
+                        return Tap(
                           onTap: () => openBookInfo(context, infoFrom(s)),
                           onLongPress: () {
                             haptic(true);
@@ -226,7 +226,7 @@ class _DiscoverScreenState extends State<DiscoverScreen> {
                     final b = _results![i];
                     final isSaved = Library.i.isSaved(b.key);
                     final owned = Library.i.copyOf(b);
-                    return GestureDetector(
+                    return Tap(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => openBookInfo(context, b),
                       onLongPress: () {

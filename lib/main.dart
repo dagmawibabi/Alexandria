@@ -1,4 +1,7 @@
+import 'dart:ui' show PointerDeviceKind;
+
 import 'package:flutter/services.dart';
+import 'package:just_audio_media_kit/just_audio_media_kit.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:pdfrx/pdfrx.dart';
 
@@ -23,15 +26,17 @@ import 'services/volume_keys.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 
-Future<void> main() async {
+Future<void> main(List<String> args) async {
   WidgetsFlutterBinding.ensureInitialized();
+  // just_audio has no Windows/Linux player of its own; media_kit (libmpv) supplies one.
+  JustAudioMediaKit.ensureInitialized();
   await Future.wait([Settings.i.load(), Storage.init(), pdfrxFlutterInitialize()]);
   await Future.wait([Library.i.load(), AudioLibrary.i.load(), Podcasts.i.load(), UsageLog.i.load(), RadioDirectory.i.load(), SearchHistory.i.load()]);
   await AlexandriaAudioHandler.init();
   ApiCache.prune().ignore();
   StatWidgets.i.init();
   AudioLibrary.i.resumeDownloads();
-  await IncomingFiles.init();
+  await IncomingFiles.init(args);
   Ai.ready.ignore();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const AlexandriaApp());
@@ -82,12 +87,38 @@ class _AlexandriaAppState extends State<AlexandriaApp> {
           navigatorKey: navigatorKey,
           navigatorObservers: [VolumeKeys.routes],
           debugShowCheckedModeBanner: false,
+          // Mouse users can drag chip rows and carousels sideways, as on a phone.
+          scrollBehavior: const _DragScroll(),
           themeMode: s.themeMode,
           theme: buildTheme(Brightness.light, s),
           darkTheme: buildTheme(Brightness.dark, s),
           home: const Shell(),
+          // Esc steps back a page (or closes a sheet), as on any desktop app.
+          // In a text field it just leaves the field.
+          builder: (context, child) => Focus(
+            canRequestFocus: false,
+            skipTraversal: true,
+            onKeyEvent: (node, e) {
+              if (e is! KeyDownEvent || e.logicalKey != LogicalKeyboardKey.escape) return KeyEventResult.ignored;
+              final focus = FocusManager.instance.primaryFocus;
+              if (focus?.context?.findAncestorStateOfType<EditableTextState>() != null) {
+                focus!.unfocus();
+                return KeyEventResult.handled;
+              }
+              navigatorKey.currentState?.maybePop();
+              return KeyEventResult.handled;
+            },
+            child: NavFrame(navigator: navigatorKey, child: child!),
+          ),
         );
       },
     );
   }
+}
+
+class _DragScroll extends MaterialScrollBehavior {
+  const _DragScroll();
+
+  @override
+  Set<PointerDeviceKind> get dragDevices => {...super.dragDevices, PointerDeviceKind.mouse};
 }

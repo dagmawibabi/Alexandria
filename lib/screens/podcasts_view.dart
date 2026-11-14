@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import '../core/net_image.dart';
@@ -330,12 +331,14 @@ class _PodcastsScreenState extends State<PodcastsScreen> with WidgetsBindingObse
               );
             }
             return LayoutBuilder(builder: (context, c) {
-              final w = (c.maxWidth - 40 - 12 * 2) / 3;
+              // Three across on a phone; on a wide window, as many as keep the art near that size.
+              final n = math.max(3, ((c.maxWidth - 40) / 170).floor());
+              final w = (c.maxWidth - 40 - 12 * (n - 1)) / n;
               return Padding(
                 padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
                 child: Wrap(spacing: 12, runSpacing: 16, children: [
                   for (final (n, h) in list.indexed)
-                    GestureDetector(
+                    Tap(
                       onTap: () => openPodcast(context, hit: h),
                       child: SizedBox(
                         width: w,
@@ -369,7 +372,7 @@ class ShowTile extends StatelessWidget {
     final pods = Podcasts.i;
     final unplayed = show.episodes.take(10).where((e) => pods.stage(e) == 'unplayed').length;
     final fav = pods.showMark(show.feedUrl).favorite;
-    return GestureDetector(
+    return Tap(
       onTap: () => openPodcast(context, feedUrl: show.feedUrl),
       onLongPress: () {
         haptic(true);
@@ -490,7 +493,7 @@ class _ShowsScreenState extends State<ShowsScreen> {
     return Scaffold(
       appBar: AppBar(title: AppTitle(_shelf == 'recent' ? 'Recently added' : 'Your shows')),
       bottomNavigationBar: const PagePlayer(),
-      body: ListenableBuilder(
+      body: PageWidth(child: ListenableBuilder(
         listenable: Podcasts.i,
         builder: (context, _) {
           final shows = _shows();
@@ -545,7 +548,7 @@ class _ShowsScreenState extends State<ShowsScreen> {
               ),
           ]);
         },
-      ),
+      )),
     );
   }
 }
@@ -596,7 +599,7 @@ void openEpisodes(BuildContext context, String title, List<Episode> Function() e
     builder: (_) => Scaffold(
       appBar: AppBar(title: AppTitle(title)),
       bottomNavigationBar: const PagePlayer(),
-      body: ListenableBuilder(
+      body: PageWidth(child: ListenableBuilder(
         listenable: Listenable.merge([Podcasts.i, Player.i, Downloads.i]),
         builder: (context, _) {
           final list = episodes();
@@ -607,7 +610,7 @@ void openEpisodes(BuildContext context, String title, List<Episode> Function() e
             itemBuilder: (_, i) => EpisodeRow(episode: list[i], showShow: showShow),
           );
         },
-      ),
+      )),
     ),
   ));
 }
@@ -620,7 +623,7 @@ class _ShowRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final subbed = hit.feedUrl != null && Podcasts.i.subscribed(hit.feedUrl!);
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () => openPodcast(context, hit: hit),
       child: Padding(
@@ -701,7 +704,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
     return Scaffold(
       appBar: AppBar(title: AppTitle('Podcast')),
       bottomNavigationBar: const PagePlayer(),
-      body: FutureBuilder<Podcast?>(
+      body: PageWidth(max: 1500, child: FutureBuilder<Podcast?>(
         future: _feed,
         // Show what we already know while the feed refreshes.
         initialData: _url == null ? null : Podcasts.i.cached(_url!),
@@ -738,7 +741,47 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 counts[st] = (counts[st] ?? 0) + 1;
               }
               int count(String stage) => counts[stage] ?? 0;
-              return RefreshIndicator(
+              // On a wide window the show's details get their own column beside the episodes.
+              final wide = isWide(context);
+              final details = <Widget>[
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 120, child: ViewableImage(url: pod.imageUrl ?? widget.hit?.artwork, title: pod.title, child: PodcastArt(pod.imageUrl ?? widget.hit?.artwork, title: pod.title))),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(pod.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.15)),
+                    if (pod.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(pod.author, maxLines: 2, style: TextStyle(color: t.muted))),
+                    const SizedBox(height: 8),
+                    Label('${pod.episodes.length} episodes${loading ? ' · updating' : ''}', size: 9),
+                  ]),
+                ),
+              ]),
+              const SizedBox(height: 16),
+              Row(children: [
+                Expanded(
+                  child: PrimaryButton(subbed ? 'Subscribed' : 'Subscribe', ghost: subbed, icon: subbed ? Icons.check_sharp : Icons.add_sharp, onTap: () {
+                    subbed ? Podcasts.i.unsubscribe(pod.feedUrl) : Podcasts.i.subscribe(pod);
+                  }),
+                ),
+                const SizedBox(width: 10),
+                if (pod.episodes.isNotEmpty) ToolButton(Icons.play_arrow_sharp, size: 48, tooltip: 'Play latest', onTap: () => playEpisode(context, pod.episodes.first)),
+                const SizedBox(width: 10),
+                _DownloadAll(pod: pod, episodes: eps, filtered: _filter != 'all'),
+                const SizedBox(width: 10),
+                ToolButton(Icons.ios_share_sharp, size: 48, tooltip: 'Share card', onTap: () => showMediaCard(context, ShareItem.podcast(pod, Podcasts.i.showMark(pod.feedUrl)))),
+              ]),
+              const SizedBox(height: 14),
+              MarksBar(mark: Podcasts.i.showMark(pod.feedUrl), title: pod.title, changed: Podcasts.i.marksChanged, folders: () => Podcasts.i.foldersOf(pod.feedUrl), onFolder: (id) => Podcasts.i.toggleFolder(pod.feedUrl, id)),
+              if (pod.description.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                CollapsibleText(pod.description, lines: 4, style: TextStyle(height: 1.5, color: t.ink.withValues(alpha: .85))),
+              ],
+              if (pod.categories.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Wrap(spacing: 6, runSpacing: 6, children: [for (final c in pod.categories.take(6)) Tag(c)]),
+              ],
+              ];
+              final list = RefreshIndicator(
                 onRefresh: () => ApiCache.fresh(() async {
                   setState(() => _feed = _load());
                   await _feed;
@@ -750,44 +793,7 @@ class _PodcastScreenState extends State<PodcastScreen> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       // The show's details step aside during a search, so the results
                       // sit right under the box instead of behind the keyboard.
-                      if (query.isEmpty) ...[
-                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        SizedBox(width: 120, child: ViewableImage(url: pod.imageUrl ?? widget.hit?.artwork, title: pod.title, child: PodcastArt(pod.imageUrl ?? widget.hit?.artwork, title: pod.title))),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(pod.title, maxLines: 3, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, height: 1.15)),
-                            if (pod.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(pod.author, maxLines: 2, style: TextStyle(color: t.muted))),
-                            const SizedBox(height: 8),
-                            Label('${pod.episodes.length} episodes${loading ? ' · updating' : ''}', size: 9),
-                          ]),
-                        ),
-                      ]),
-                      const SizedBox(height: 16),
-                      Row(children: [
-                        Expanded(
-                          child: PrimaryButton(subbed ? 'Subscribed' : 'Subscribe', ghost: subbed, icon: subbed ? Icons.check_sharp : Icons.add_sharp, onTap: () {
-                            subbed ? Podcasts.i.unsubscribe(pod.feedUrl) : Podcasts.i.subscribe(pod);
-                          }),
-                        ),
-                        const SizedBox(width: 10),
-                        if (pod.episodes.isNotEmpty) ToolButton(Icons.play_arrow_sharp, size: 48, tooltip: 'Play latest', onTap: () => playEpisode(context, pod.episodes.first)),
-                        const SizedBox(width: 10),
-                        _DownloadAll(pod: pod, episodes: eps, filtered: _filter != 'all'),
-                        const SizedBox(width: 10),
-                        ToolButton(Icons.ios_share_sharp, size: 48, tooltip: 'Share card', onTap: () => showMediaCard(context, ShareItem.podcast(pod, Podcasts.i.showMark(pod.feedUrl)))),
-                      ]),
-                      const SizedBox(height: 14),
-                      MarksBar(mark: Podcasts.i.showMark(pod.feedUrl), title: pod.title, changed: Podcasts.i.marksChanged, folders: () => Podcasts.i.foldersOf(pod.feedUrl), onFolder: (id) => Podcasts.i.toggleFolder(pod.feedUrl, id)),
-                      if (pod.description.isNotEmpty) ...[
-                        const SizedBox(height: 18),
-                        CollapsibleText(pod.description, lines: 4, style: TextStyle(height: 1.5, color: t.ink.withValues(alpha: .85))),
-                      ],
-                      if (pod.categories.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Wrap(spacing: 6, runSpacing: 6, children: [for (final c in pod.categories.take(6)) Tag(c)]),
-                      ],
-                      ],
+                      if (query.isEmpty && !wide) ...details,
                       SectionHeader(
                         '',
                         query.isEmpty ? 'Episodes' : '${eps.length} found',
@@ -830,10 +836,16 @@ class _PodcastScreenState extends State<PodcastScreen> {
                 ),
               ]),
               );
+              if (!wide) return list;
+              return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 400, child: ListView(padding: const EdgeInsets.fromLTRB(28, 8, 24, 32), children: details)),
+                Container(width: 1, color: t.line),
+                Expanded(child: list),
+              ]);
             },
           );
         },
-      ),
+      )),
     );
   }
 }
@@ -898,7 +910,7 @@ class EpisodeRow extends StatelessWidget {
       if (pods.isDownloaded(e)) 'Downloaded',
       if (pods.queued(e)) 'Queued',
     ].where((s) => s.isNotEmpty).join(' · ');
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () => showEpisode(context, e, podcast: podcast),
       child: Container(
@@ -930,7 +942,7 @@ class EpisodeRow extends StatelessWidget {
             SizedBox(
               width: 40,
               height: 40,
-              child: GestureDetector(
+              child: Tap(
                 onTap: () => Downloads.i.cancel(e.guid),
                 child: Padding(padding: const EdgeInsets.all(10), child: CircularProgressIndicator(strokeWidth: 2, value: dl < 0 ? null : dl)),
               ),

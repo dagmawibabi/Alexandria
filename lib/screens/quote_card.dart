@@ -87,12 +87,12 @@ class CardColorPicker extends StatelessWidget {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Row(children: [
         Expanded(child: Label(label)),
-        if (value != null) GestureDetector(onTap: () => onChanged(null), child: Label(resetLabel, color: t.accent, weight: FontWeight.w600)),
+        if (value != null) Tap(onTap: () => onChanged(null), child: Label(resetLabel, color: t.accent, weight: FontWeight.w600)),
       ]),
       const SizedBox(height: 8),
       Wrap(spacing: 8, runSpacing: 8, children: [
         for (final c in _swatches)
-          GestureDetector(
+          Tap(
             onTap: () {
               haptic();
               onChanged(c);
@@ -164,7 +164,7 @@ class _QuoteStudioState extends State<QuoteStudio> {
           child: ToolButton(Icons.ios_share_sharp, label: _sharing ? '…' : 'Share', active: true, size: 38, onTap: _sharing ? null : _share),
         ),
       ]),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
+      body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
         Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .55),
@@ -199,7 +199,7 @@ class _QuoteStudioState extends State<QuoteStudio> {
           height: 64,
           child: ListView(scrollDirection: Axis.horizontal, children: [
             for (final i in cardStyleOrder)
-              GestureDetector(
+              Tap(
                 onTap: () {
                   haptic();
                   // A style brings its own background, so this clears any custom one.
@@ -231,7 +231,7 @@ class _QuoteStudioState extends State<QuoteStudio> {
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (var i = 0; i < highlightColors.length; i++)
-              GestureDetector(
+              Tap(
                 onTap: () => setState(() => _color = i),
                 child: Container(
                   width: 34,
@@ -267,7 +267,7 @@ class _QuoteStudioState extends State<QuoteStudio> {
         ),
         if (widget.note.isNotEmpty) ToggleRow(label: 'Include my note', value: _showNote, onChanged: (v) => setState(() => _showNote = v)),
         ToggleRow(label: 'Centre text', value: _center, onChanged: (v) => setState(() => _center = v)),
-      ]),
+      ])),
     );
   }
 }

@@ -66,7 +66,7 @@ class _StatWidgetsScreenState extends State<StatWidgetsScreen> {
     final size = StatWidgets.defaultSize(_kind);
     return Scaffold(
       appBar: AppBar(title: AppTitle('Home-screen widgets')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+      body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
         Segmented<String>(
           values: widgetKinds,
           labels: [for (final k in widgetKinds) widgetKindNames[k]!],
@@ -125,7 +125,7 @@ class _StatWidgetsScreenState extends State<StatWidgetsScreen> {
         ToggleRow(label: 'This week', value: st.showWeek, onChanged: (v) => _change((s) => s.showWeek = v)),
         ToggleRow(label: 'Streak', value: st.showStreak, onChanged: (v) => _change((s) => s.showStreak = v)),
         ToggleRow(label: 'Finished count', value: st.showDone, onChanged: (v) => _change((s) => s.showDone = v)),
-      ]),
+      ])),
     );
   }
 }

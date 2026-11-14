@@ -189,9 +189,11 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
                   ),
                 ]),
               ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 6, 20, 40),
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              // The banner spans the window; the text keeps to a readable column.
+              Center(child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 1400), child: Padding(
+                padding: EdgeInsets.fromLTRB(isWide(context) ? 40 : 20, 6, isWide(context) ? 40 : 20, 40),
+                // Wide: title and actions on the left, about and record beside them.
+                child: SplitColumns(left: [
                   Text(_b.title, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w700, height: 1.1, letterSpacing: -.6)),
                   if (_b.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(_b.author, style: TextStyle(color: t.muted, fontSize: 16))),
                   const SizedBox(height: 14),
@@ -210,7 +212,8 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
                     final rec = Library.i.savedOr(savedFrom(_b));
                     return MarksBar(mark: rec.mark, title: _b.title, changed: () => Library.i.savedChanged(rec), folders: () => rec.folderIds, onFolder: (id) => Library.i.toggleSavedFolder(rec, id));
                   }),
-                  SectionHeader('01', t.zen ? 'About' : 'Abstract', padding: const EdgeInsets.fromLTRB(0, 28, 0, 12)),
+                ], right: [
+                  SectionHeader('01', t.zen ? 'About' : 'Abstract', padding: EdgeInsets.fromLTRB(0, isWide(context) ? 6 : 28, 0, 12)),
                   if (desc.isNotEmpty)
                     CollapsibleText(desc, style: TextStyle(height: 1.55, color: t.ink.withValues(alpha: .85)))
                   else if (loading)
@@ -238,7 +241,7 @@ class _BookInfoScreenState extends State<BookInfoScreen> {
                     Wrap(spacing: 6, runSpacing: 6, children: [for (final s in subjects.take(12)) Tag(s.length > 40 ? '${s.substring(0, 40)}…' : s)]),
                   ],
                 ]),
-              ),
+              ))),
             ]);
           },
         ),

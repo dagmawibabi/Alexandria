@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 
@@ -219,7 +220,8 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 sliver: SliverLayoutBuilder(builder: (context, c) {
                   // Tile height = cover (2:3) + room for two title lines and the status label,
                   // so nothing spills into the row below at any column count or text size.
-                  final n = s.gridColumns;
+                  // The setting is for a phone; a wide window keeps covers near the same size.
+                  final n = math.max(s.gridColumns, (c.crossAxisExtent / 160).floor());
                   final tileW = (c.crossAxisExtent - 14 * (n - 1)) / n;
                   final textH = MediaQuery.textScalerOf(context).scale(46) + 14;
                   return SliverGrid(
@@ -245,7 +247,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
                   strip: false,
                   builder: (w) => [
                     for (final x in wanted)
-                      GestureDetector(
+                      Tap(
                         onTap: () => openBookInfo(context, infoFrom(x)),
                         child: SizedBox(
                           width: w,
@@ -361,7 +363,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
         for (final it in items)
           Padding(
             padding: const EdgeInsets.only(right: 6),
-            child: GestureDetector(
+            child: Tap(
               onLongPress: lib.folders.any((f) => f.id == it.$1) ? () => showFolderEditor(context, folder: lib.folders.firstWhere((f) => f.id == it.$1)) : null,
               child: Tag(
                 it.$3 == null ? it.$2 : '■ ${it.$2}',
@@ -489,7 +491,8 @@ class _ContinueRail extends StatelessWidget {
           itemCount: items.length,
           separatorBuilder: (_, _) => const SizedBox(width: 10),
           // One card fills the row; more than one peeks to show it scrolls.
-          itemBuilder: (_, i) => SizedBox(width: items.length == 1 ? w - 40 : w * .8, child: items[i].$3),
+          // On a wide window the cards keep a card's width instead of spanning the page.
+          itemBuilder: (_, i) => SizedBox(width: isWide(context) ? 520 : (items.length == 1 ? w - 40 : w * .8), child: items[i].$3),
         ),
       ),
     ]);
@@ -600,7 +603,10 @@ class _Tiles extends StatelessWidget {
         ),
       );
     }
-    final w = (MediaQuery.of(context).size.width - 40 - 24) / 3;
+    // Three across on a phone; on a wide window, as many as keep tiles near phone size.
+    final avail = MediaQuery.of(context).size.width - 40;
+    final n = math.max(3, (avail / 170).floor());
+    final w = (avail - 12 * (n - 1)) / n;
     return Padding(padding: const EdgeInsets.symmetric(horizontal: 20), child: Wrap(spacing: 12, runSpacing: 16, children: builder(w)));
   }
 }
@@ -612,7 +618,7 @@ class _AudioTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Tap(
       onTap: () => openAudiobook(context, book),
       onLongPress: () {
         haptic(true);
@@ -679,7 +685,7 @@ class _GridTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return GestureDetector(
+    return Tap(
       onTap: () => openBook(context, book),
       onLongPress: () {
         haptic(true);
@@ -707,7 +713,7 @@ class _ListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final folders = Library.i.folders.where((f) => book.folderIds.contains(f.id)).toList();
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () => openBook(context, book),
       onLongPress: () {

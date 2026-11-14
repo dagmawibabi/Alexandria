@@ -489,3 +489,15 @@ input[type="range"]:active::-webkit-slider-thumb { transform: scaleY(1.16); }
 /* Monochrome: the accent follows the ink, as it does in the app. */
 .site-mono { --signal: #141414 !important; --on-signal: #FFFFFF !important; }
 .site-mono .plate.dark { --signal: #ECEAE4; --on-signal: #141414; }
+
+/* ---------- desktop: the Windows app in two framed windows ---------- */
+.desk-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: clamp(16px, 2.4vw, 32px); align-items: end; }
+.desk { margin: 0; overflow: hidden; border-radius: 10px; background: #0d0d0d; box-shadow: 0 34px 60px -24px rgba(0, 0, 0, .6), 0 8px 18px -6px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255, 255, 255, .13); }
+.desk img { display: block; width: 100%; height: auto; }
+.desk-second { transform: translateY(clamp(0px, 3vw, 40px)); }
+.desk-foot { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 16px 40px; margin-top: clamp(40px, 6vw, 88px); align-items: start; }
+.desk-foot .cta { margin-top: 0; }
+@media (max-width: 900px) {
+  .desk-grid, .desk-foot { grid-template-columns: 1fr; }
+  .desk-second { transform: none; }
+}

@@ -234,7 +234,7 @@ class _MediaStudioState extends State<MediaStudio> {
           child: ToolButton(Icons.ios_share_sharp, label: _sharing ? '…' : 'Share', active: true, size: 38, onTap: _sharing ? null : _share),
         ),
       ]),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
+      body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
         Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * .58),
@@ -254,7 +254,7 @@ class _MediaStudioState extends State<MediaStudio> {
           height: 56,
           child: ListView(scrollDirection: Axis.horizontal, children: [
             for (final n in cardStyleOrder)
-              GestureDetector(
+              Tap(
                 onTap: () {
                   haptic();
                   // A style brings its own background, so this clears any custom one.
@@ -299,7 +299,7 @@ class _MediaStudioState extends State<MediaStudio> {
         if ((i.progress ?? 0) > 0) ToggleRow(label: 'Show my progress', value: _progress, onChanged: (v) => setState(() => _progress = v)),
         if (i.about.isNotEmpty) ToggleRow(label: 'Include description', value: _about, onChanged: (v) => setState(() => _about = v)),
         if (i.note.isNotEmpty) ToggleRow(label: 'Include my latest note', value: _note, onChanged: (v) => setState(() => _note = v)),
-      ]),
+      ])),
     );
   }
 }

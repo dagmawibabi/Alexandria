@@ -30,7 +30,7 @@ class ListenPanel extends StatefulWidget {
 
 class _ListenPanelState extends State<ListenPanel> {
   static const _info = {
-    'device': ('Built into your phone · free · offline', ''),
+    'device': ('Built into your device · free · offline', ''),
     'addis': ('Amharic, Afaan Oromo & Tigrinya voices', 'https://platform.addisassistant.com'),
     'elevenlabs': ('Lifelike voices in 30+ languages', 'https://elevenlabs.io/app/settings/api-keys'),
   };
@@ -154,7 +154,7 @@ class _ListenPanelState extends State<ListenPanel> {
   Widget _engineRow(BuildContext context, String e) {
     final t = Tokens.of(context);
     final on = _engine == e;
-    return GestureDetector(
+    return Tap(
       onTap: () {
         haptic();
         Speech.stop();
@@ -200,7 +200,7 @@ class _ListenPanelState extends State<ListenPanel> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
           Expanded(child: Label('${Speech.name(id)} key', color: t.ink, weight: FontWeight.w600)),
-          GestureDetector(onTap: () => launchUrlString(_info[id]!.$2, mode: LaunchMode.externalApplication), child: Label('Get key ↗', color: t.accent)),
+          Tap(onTap: () => launchUrlString(_info[id]!.$2, mode: LaunchMode.externalApplication), child: Label('Get key ↗', color: t.accent)),
         ]),
         const SizedBox(height: 10),
         Row(children: [
@@ -267,7 +267,7 @@ class _ListenPanelState extends State<ListenPanel> {
             if (!snap.hasData) return ListView(physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.symmetric(horizontal: 12), children: const [SkeletonRows(count: 6, art: null)]);
             final q = _search.text.toLowerCase();
             final voices = [
-              if (q.isEmpty) Voice(id: '', name: 'Default', provider: engine, description: engine == 'device' ? 'Your phone\'s chosen voice' : 'The provider\'s standard voice'),
+              if (q.isEmpty) Voice(id: '', name: 'Default', provider: engine, description: engine == 'device' ? 'Your device\'s chosen voice' : 'The provider\'s standard voice'),
               ...snap.data!.where((v) => q.isEmpty || '${v.name} ${v.traits} ${v.language ?? ''}'.toLowerCase().contains(q)),
             ];
             if (voices.isEmpty) return const Center(child: Label('No voices match'));
@@ -279,7 +279,7 @@ class _ListenPanelState extends State<ListenPanel> {
                 final on = v.id == chosen.id;
                 final playing = _previewing == v.id;
                 final sub = [v.traits, if (v.traits.isEmpty) v.description ?? ''].where((x) => x.isNotEmpty).join(' · ');
-                return GestureDetector(
+                return Tap(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
                     haptic();

@@ -48,7 +48,17 @@ class AudiobookScreen extends StatelessWidget {
             _source(b),
             if (b.year.isNotEmpty) b.year,
           ].join(' · ');
-          return ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+          final wide = isWide(context);
+          return SplitDetail(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), side: [
+            if (wide) ...[
+              Center(child: SizedBox(width: 280, child: ViewableImage(path: b.coverPath, url: b.coverUrl, title: b.title, child: AudioCover(b)))),
+              const SizedBox(height: 20),
+              Text(b.title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w700, height: 1.15, letterSpacing: -.3)),
+              if (b.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 6), child: Text(b.author, style: TextStyle(color: t.muted, fontSize: 15))),
+              if (b.narrator.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 2), child: Text('Read by ${b.narrator}', style: TextStyle(color: t.muted, fontSize: 13))),
+              const SizedBox(height: 8),
+              Text(facts, style: TextStyle(color: t.muted, fontSize: 12.5, height: 1.35)),
+            ] else
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               SizedBox(width: 128, child: ViewableImage(path: b.coverPath, url: b.coverUrl, title: b.title, child: AudioCover(b))),
               const SizedBox(width: 16),
@@ -113,6 +123,7 @@ class AudiobookScreen extends StatelessWidget {
               folders: () => b.folderIds,
               onFolder: (id) => AudioLibrary.i.toggleFolder(b, id),
             ),
+          ], main: [
             if (b.mark.notes.isNotEmpty) ...[
               SectionHeader('', 'Notes · ${b.mark.notes.length}', padding: const EdgeInsets.fromLTRB(0, 24, 0, 10)),
               for (final n in b.mark.notes.take(3))
@@ -129,7 +140,7 @@ class AudiobookScreen extends StatelessWidget {
                   ),
                 ),
               if (b.mark.notes.length > 3)
-                GestureDetector(
+                Tap(
                   onTap: () => showNotes(context, title: b.title, mark: b.mark, changed: () => AudioLibrary.i.touch(b), here: () => (track: b.trackIndex, ms: b.positionMs), onSeek: (n) => _seekTo(context, n)),
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 4), child: Label('All notes', color: t.accent, weight: FontWeight.w600)),
                 ),

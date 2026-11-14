@@ -130,9 +130,9 @@ class _AudiobookCreateScreenState extends State<AudiobookCreateScreen> {
     final t = Tokens.of(context);
     return Scaffold(
       appBar: AppBar(title: AppTitle('New audiobook')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
+      body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          GestureDetector(
+          Tap(
             onTap: () async {
               final f = await FilePicker.pickFiles(type: FileType.image);
               final path = f.firstOrNull?.path;
@@ -244,7 +244,7 @@ class _AudiobookCreateScreenState extends State<AudiobookCreateScreen> {
         ),
         const SizedBox(height: 10),
         Text('Files are copied into Alexandria so they keep working even if the originals move.', style: TextStyle(color: t.muted, fontSize: 12.5)),
-      ]),
+      ])),
     );
   }
 }

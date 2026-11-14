@@ -1,9 +1,11 @@
+import 'dart:math' as math;
 import 'package:material_ui/material_ui.dart';
 
 import '../core/search_box.dart';
 import '../core/theme.dart';
 import '../core/ui.dart';
 import '../models/audiobook.dart';
+import '../models/book.dart';
 import '../services/api_cache.dart';
 import '../services/audio.dart';
 import '../services/folders.dart';
@@ -134,7 +136,7 @@ class _AudiobooksScreenState extends State<AudiobooksScreen> {
                 const SizedBox(height: 12),
                 Text('No audiobooks yet', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                 const SizedBox(height: 6),
-                Text('Add MP3, M4A/M4B, OGG or other audio files from your phone. Alexandria looks up the cover and description for you. Or stream thousands of free public-domain audiobooks.',
+                Text('Add MP3, M4A/M4B, OGG or other audio files from your device. Alexandria looks up the cover and description for you. Or stream thousands of free public-domain audiobooks.',
                     style: TextStyle(color: t.muted, height: 1.45)),
                 const SizedBox(height: 18),
                 PrimaryButton('Add audio files', icon: Icons.audio_file_outlined, expand: true, onTap: () => addAudiobookFromFiles(context)),
@@ -177,13 +179,14 @@ class _AudiobooksScreenState extends State<AudiobooksScreen> {
       SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 20),
         sliver: SliverLayoutBuilder(builder: (context, c) {
-          final tileW = (c.crossAxisExtent - 14 * 2) / 3;
+          final n = math.max(3, (c.crossAxisExtent / 170).floor());
+          final tileW = (c.crossAxisExtent - 14 * (n - 1)) / n;
           final textH = MediaQuery.textScalerOf(context).scale(46) + 14;
           return SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, mainAxisSpacing: 16, crossAxisSpacing: 14, mainAxisExtent: tileW + textH),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: n, mainAxisSpacing: 16, crossAxisSpacing: 14, mainAxisExtent: tileW + textH),
             delegate: SliverChildBuilderDelegate((context, i) {
               final b = books[i];
-              return GestureDetector(
+              return Tap(
                 onTap: () => openAudiobook(context, b),
                 onLongPress: () {
                   haptic(true);
@@ -264,7 +267,7 @@ class _AudiobooksScreenState extends State<AudiobooksScreen> {
             itemBuilder: (context, i) {
               final f = results[i];
               final have = AudioLibrary.i.shelved(f);
-              return GestureDetector(
+              return Tap(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => FreeAudiobookScreen(book: f))),
                 child: Padding(
@@ -300,7 +303,10 @@ class _FreeCover extends StatelessWidget {
     final t = Tokens.of(context);
     return ClipRRect(
       borderRadius: BorderRadius.circular(t.zen ? 12 : t.radius + 2),
-      child: FittedBox(fit: BoxFit.cover, clipBehavior: Clip.hardEdge, child: SizedBox(width: 100, height: 150, child: NetCover(url: f.coverUrl, title: f.title))),
+      // Without art, the generated cover is drawn square so its title isn't cropped away.
+      child: f.coverUrl == null
+          ? AspectRatio(aspectRatio: 1, child: GeneratedCover(Book(id: f.key, title: f.title, author: f.author, format: BookFormat.epub, path: '')))
+          : FittedBox(fit: BoxFit.cover, clipBehavior: Clip.hardEdge, child: SizedBox(width: 100, height: 150, child: NetCover(url: f.coverUrl, title: f.title))),
     );
   }
 }
@@ -332,7 +338,7 @@ class _ContinueListening extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 12),
-          GestureDetector(
+          Tap(
             onTap: () {
               haptic(true);
               if (active) {
@@ -438,8 +444,9 @@ class _FreeAudiobookScreenState extends State<FreeAudiobookScreen> {
         builder: (context, snap) {
           final tracks = snap.data ?? const <AudioTrack>[];
           final total = tracks.fold(0, (a, x) => a + x.ms) ~/ 1000;
-          return ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
-            Center(child: SizedBox(width: 200, height: 200, child: _FreeCover(f))),
+          final cover = isWide(context) ? 300.0 : 200.0;
+          return SplitDetail(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), side: [
+            Center(child: SizedBox(width: cover, height: cover, child: _FreeCover(f))),
             const SizedBox(height: 20),
             Text(f.title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.15)),
             if (f.author.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 4), child: Text(f.author, textAlign: TextAlign.center, style: TextStyle(color: t.muted, fontSize: 15))),
@@ -496,7 +503,9 @@ class _FreeAudiobookScreenState extends State<FreeAudiobookScreen> {
               },
             ),
             const SizedBox(height: 6),
-            Center(child: Label('Streams until downloaded · text from Project Gutenberg when available', size: 9)),
+            // Wraps rather than truncating when it sits in a narrow side column.
+            Text('Streams until downloaded · text from Project Gutenberg when available'.toUpperCase(), textAlign: TextAlign.center, style: mono(context, size: 9)),
+          ], main: [
             if (f.description.isNotEmpty) ...[
               const SectionHeader('01', 'About', padding: EdgeInsets.fromLTRB(0, 26, 0, 10)),
               CollapsibleText(f.description, lines: 5, style: TextStyle(height: 1.5, color: t.ink.withValues(alpha: .85))),

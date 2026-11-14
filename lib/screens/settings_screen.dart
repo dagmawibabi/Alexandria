@@ -43,7 +43,7 @@ class SettingsScreen extends StatelessWidget {
             _Row(Icons.palette_outlined, 'Appearance', look, () => _open(context, 'Appearance', const _Appearance())),
             _Row(Icons.grid_view_sharp, 'Library', s.libraryGrid ? 'Grid · ${s.gridColumns} columns' : 'List', () => _open(context, 'Library', const _Library())),
             _Row(Icons.flag_outlined, 'Goals', '${s.dailyGoalMinutes} min a day · ${s.yearlyGoalBooks} books a year', () => _open(context, 'Goals', const GoalControls())),
-            _Row(Icons.widgets_outlined, 'Home-screen widgets', 'Your stats on the home screen, in your style', () => openStatWidgets(context)),
+            if (kMobile) _Row(Icons.widgets_outlined, 'Home-screen widgets', 'Your stats on the home screen, in your style', () => openStatWidgets(context)),
             const _Group('Reading'),
             _Row(Icons.text_fields_sharp, 'Type', '${s.fontFamily} · ${s.fontSize.round()} pt', () => _open(context, 'Type', const TypeControls())),
             _Row(Icons.contrast_sharp, 'Light & surface', 'Page colours, night mode, warmth', () => _open(context, 'Light & surface', const LightControls())),
@@ -56,7 +56,7 @@ class SettingsScreen extends StatelessWidget {
               [
                 s.openPlayerOnPlay ? 'Full player on play' : 'Mini player',
                 EpisodeSort.parse(s.episodeSort).label,
-                s.podcastAlerts ? 'Alerts every ${s.podcastCheckHours} h' : 'Alerts off',
+                if (kMobile) s.podcastAlerts ? 'Alerts every ${s.podcastCheckHours} h' : 'Alerts off',
               ].join(' · '),
               () => _open(context, 'Player & podcasts', const _PlayerAndPodcasts()),
             ),
@@ -74,7 +74,7 @@ class SettingsScreen extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (ctx) => Scaffold(
         appBar: AppBar(title: AppTitle(title)),
-        body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [body]),
+        body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [body])),
       ),
     ));
   }
@@ -156,7 +156,7 @@ class _Appearance extends StatelessWidget {
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final c in accents)
-              GestureDetector(
+              Tap(
                 onTap: () {
                   haptic();
                   s.accent = c;
@@ -191,7 +191,7 @@ class _Appearance extends StatelessWidget {
           Wrap(spacing: 6, runSpacing: 6, children: [for (final f in uiFonts) Tag(f, filled: s.uiFont == f, onTap: () => s.uiFont = f)]),
           const SizedBox(height: 8),
           if (!s.zen) ToggleRow(label: 'Dot-grid backdrop', value: s.dotGrid, onChanged: (v) => s.dotGrid = v),
-          ToggleRow(label: 'Haptics', value: s.haptics, onChanged: (v) => s.haptics = v),
+          if (kMobile) ToggleRow(label: 'Haptics', value: s.haptics, onChanged: (v) => s.haptics = v),
         ]);
       },
     );
@@ -398,7 +398,8 @@ class _PodcastAlertsState extends State<_PodcastAlerts> {
       builder: (context, _) {
         final s = Settings.i;
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SettingToggle(
+          // Background checks are scheduled by Android; a desktop app only checks while it's open.
+          if (kMobile) SettingToggle(
             title: 'Alert me to new episodes',
             hint: 'Checks your subscribed shows even when the app is closed.',
             value: s.podcastAlerts,
@@ -407,7 +408,7 @@ class _PodcastAlertsState extends State<_PodcastAlerts> {
               Podcasts.i.syncBackgroundCheck();
             },
           ),
-          if (s.podcastAlerts)
+          if (kMobile && s.podcastAlerts)
             SettingSlider(
               title: 'Check every',
               hint: 'Android picks the exact moment to save battery, so it can run later than this.',

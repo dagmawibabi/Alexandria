@@ -35,12 +35,12 @@ class _StatsScreenState extends State<StatsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: AppTitle('Stats'), actions: [
-        IconButton(tooltip: 'Home-screen widgets', onPressed: () => openStatWidgets(context), icon: const Icon(Icons.widgets_outlined)),
+        if (kMobile) IconButton(tooltip: 'Home-screen widgets', onPressed: () => openStatWidgets(context), icon: const Icon(Icons.widgets_outlined)),
       ]),
-      body: ListenableBuilder(
+      body: PageWidth(child: ListenableBuilder(
         listenable: Listenable.merge([Library.i, Settings.i, AudioLibrary.i, Podcasts.i]),
         builder: (context, _) => _Body(lib: Library.i, scope: _scope, onScope: (v) => setState(() => _scope = v)),
-      ),
+      )),
     );
   }
 }
@@ -316,7 +316,7 @@ class _GoalBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         haptic();
@@ -378,7 +378,7 @@ Future<void> showGoals(BuildContext context, {String? only}) {
         Row(children: [
           Expanded(child: Text(only == null ? 'Your goals' : 'Set this goal', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700))),
           if (only != null)
-            GestureDetector(
+            Tap(
               onTap: () {
                 Navigator.pop(ctx);
                 showGoals(context);
@@ -439,7 +439,7 @@ class _TopRow extends StatelessWidget {
       if (book != null) '${(book.progress * 100).round()}%',
       if (audio != null) '${(audio.progress * 100).round()}%',
     ].join(' · ');
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () {
         if (book != null) {

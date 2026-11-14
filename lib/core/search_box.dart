@@ -164,7 +164,7 @@ class _SearchBoxState extends State<SearchBox> {
                         Row(
                           children: [
                             const Expanded(child: Label('Recent', size: 9.5)),
-                            GestureDetector(
+                            Tap(
                               behavior: HitTestBehavior.opaque,
                               onTap: () => SearchHistory.i.clear(widget.historyKey),
                               child: Padding(
@@ -175,7 +175,7 @@ class _SearchBoxState extends State<SearchBox> {
                           ],
                         ),
                         for (final s in items)
-                          GestureDetector(
+                          Tap(
                             behavior: HitTestBehavior.opaque,
                             onTap: () => _pick(s),
                             child: Row(

@@ -22,6 +22,7 @@ import '../../services/library.dart';
 import '../../services/read_aloud.dart';
 import '../../services/speech.dart';
 import '../../services/volume_keys.dart';
+import '../shell.dart' show NavFrame;
 import '../ai_sheets.dart';
 import '../listen_sheet.dart';
 import '../quote_card.dart';
@@ -94,6 +95,8 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
   @override
   void initState() {
     super.initState();
+    // A book gets the whole window: the side rail steps away while it's open.
+    WidgetsBinding.instance.addPostFrameCallback((_) => NavFrame.hidden.value++);
     WidgetsBinding.instance.addObserver(this);
     // Read-along needs the position as it moves, not every two seconds.
     if (widget.follow != null) Player.i.ticks.addListener(_onAudio);
@@ -176,6 +179,9 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
 
   @override
   void dispose() {
+    // Give the rail its space back once the reader has gone.
+    WidgetsBinding.instance.addPostFrameCallback((_) => NavFrame.hidden.value--);
+    WidgetsBinding.instance.scheduleFrame();
     WidgetsBinding.instance.removeObserver(this);
     Player.i.ticks.removeListener(_onAudio);
     ReadAloud.i.removeListener(_onReadAloud);
@@ -244,8 +250,10 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
     VolumeKeys.capture(false);
   }
 
-  void _volumeTurn(int key) {
-    final dir = Settings.i.volumePagingSwapped ? -key : key;
+  void _volumeTurn(int key) => _turnPage(Settings.i.volumePagingSwapped ? -key : key);
+
+  /// One page forward (+1) or back (-1), whatever the reading mode.
+  void _turnPage(int dir) {
     _lastInteract = DateTime.now();
     switch (_mode) {
       case ReadMode.scroll:
@@ -259,6 +267,57 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
         if (to >= 1 && to <= pdf.pageCount) pdf.goToPage(pageNumber: to);
         haptic();
     }
+  }
+
+  // ------------------------------------------------------------ keyboard
+
+  /// Desktop page turning: arrows, Page Up/Down and Space; Esc leaves the book.
+  KeyEventResult _onKey(FocusNode node, KeyEvent e) {
+    if (e is! KeyDownEvent && e is! KeyRepeatEvent) return KeyEventResult.ignored;
+    // A search box or note field gets its keys untouched.
+    if (FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>() != null) return KeyEventResult.ignored;
+    final k = e.logicalKey;
+    final shift = HardwareKeyboard.instance.isShiftPressed;
+    if (k == LogicalKeyboardKey.escape) {
+      Navigator.of(context).maybePop();
+      return KeyEventResult.handled;
+    }
+    // In the scrolling view the up/down arrows nudge rather than turn a whole page.
+    if (_mode == ReadMode.scroll && _scroll.hasClients && (k == LogicalKeyboardKey.arrowDown || k == LogicalKeyboardKey.arrowUp)) {
+      final pos = _scroll.position;
+      final step = k == LogicalKeyboardKey.arrowDown ? 90.0 : -90.0;
+      _scroll.animateTo((pos.pixels + step).clamp(0.0, pos.maxScrollExtent), duration: const Duration(milliseconds: 120), curve: Curves.easeOut);
+      _lastInteract = DateTime.now();
+      return KeyEventResult.handled;
+    }
+    final int? dir = switch (k) {
+      LogicalKeyboardKey.arrowRight || LogicalKeyboardKey.arrowDown || LogicalKeyboardKey.pageDown => 1,
+      LogicalKeyboardKey.arrowLeft || LogicalKeyboardKey.arrowUp || LogicalKeyboardKey.pageUp => -1,
+      LogicalKeyboardKey.space => shift ? -1 : 1,
+      _ => null,
+    };
+    if (dir == null) return KeyEventResult.ignored;
+    _turnPage(dir);
+    return KeyEventResult.handled;
+  }
+
+  /// Lines past this many pixels get hard to follow, so on a wide window the text keeps to a column.
+  static const _maxColumn = 780.0;
+
+  /// Narrows [child] to the reading column and tells it the screen is that wide,
+  /// so anything that sizes itself from the screen (swipe cards) fits the column.
+  Widget _column(BuildContext context, Widget child) {
+    final mq = MediaQuery.of(context);
+    if (mq.size.width <= _maxColumn) return child;
+    return Center(
+      child: SizedBox(
+        width: _maxColumn,
+        child: MediaQuery(
+          data: mq.copyWith(size: Size(_maxColumn, mq.size.height)),
+          child: child,
+        ),
+      ),
+    );
   }
 
   // ------------------------------------------------------------ position
@@ -875,7 +934,13 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
 
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: overlayStyle.copyWith(statusBarColor: Colors.transparent),
-          child: Scaffold(
+          child: Focus(
+            autofocus: true,
+            onKeyEvent: _onKey,
+            // A mouse drag here selects text rather than scrolling the page.
+            child: ScrollConfiguration(
+            behavior: const MaterialScrollBehavior(),
+            child: Scaffold(
             backgroundColor: surface.bg,
             body: Stack(children: [
               Positioned.fill(
@@ -905,6 +970,8 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
               _topBar(context, style),
               _bottomBar(context, style),
             ]),
+          ),
+          ),
           ),
         );
       },
@@ -957,7 +1024,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
       case ReadMode.pdf:
         return _pdfView(context, style, d);
       case ReadMode.swipe:
-        return SwipeReader(
+        return _column(context, SwipeReader(
           key: _swipeKey,
           book: book,
           doc: d,
@@ -969,7 +1036,7 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
           onSpeak: _sayOnce,
           onTapCenter: () => _setHud(!_hud),
           turns: _swipeTurns.stream,
-        );
+        ));
       case ReadMode.scroll:
         return ListenableBuilder(
           listenable: Library.i,
@@ -991,6 +1058,10 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
                 itemBuilder: (context, i) => _Probe(
                   index: i,
                   items: _items,
+                  child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: _maxColumn),
                   child: BlockView(
                   block: d.blocks[i],
                   index: i,
@@ -1000,6 +1071,8 @@ class _ReaderScreenState extends State<ReaderScreen> with WidgetsBindingObserver
                   search: _search,
                   speaking: _speakingBlock == i || _followBlock == i,
                   bookmarked: marks.contains(i),
+                  ),
+                  ),
                   ),
                 ),
               ),

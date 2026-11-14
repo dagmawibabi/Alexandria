@@ -134,7 +134,7 @@ class RadioPaneState extends State<RadioPane> {
               const SizedBox(width: 10),
               Expanded(child: Text(code.isEmpty ? 'All countries' : s.radioCountryName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600))),
               if (code.isNotEmpty)
-                GestureDetector(
+                Tap(
                   behavior: HitTestBehavior.opaque,
                   onTap: () {
                     s.radioCountry = '';
@@ -234,7 +234,7 @@ class _CountryPickerState extends State<_CountryPicker> {
                 itemCount: list.length,
                 itemBuilder: (_, i) {
                   final c = list[i];
-                  return GestureDetector(
+                  return Tap(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => Navigator.pop(context, c),
                     child: Padding(
@@ -265,7 +265,7 @@ class StationRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final s = station;
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () => showStationMenu(context, s),
       child: Container(
@@ -314,7 +314,7 @@ class StationTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return Tap(
       onTap: () => RadioDirectory.i.play(station),
       onLongPress: () {
         haptic(true);

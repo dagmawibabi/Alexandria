@@ -245,7 +245,7 @@ Future<void> showFolderEditor(BuildContext context, {Folder? folder, ValueChange
                 }),
                 const SizedBox(height: 6),
                 if (shown != null)
-                  GestureDetector(
+                  Tap(
                     onTap: () => setS(() {
                       picked = null;
                       clearCover = true;
@@ -262,7 +262,7 @@ Future<void> showFolderEditor(BuildContext context, {Folder? folder, ValueChange
           const SizedBox(height: 8),
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final c in [...accents, ...highlightColors])
-              GestureDetector(
+              Tap(
                 onTap: () {
                   haptic();
                   setS(() => color = c.toARGB32());
@@ -321,7 +321,7 @@ class FoldersScreen extends StatelessWidget {
         ),
         Padding(padding: const EdgeInsets.only(right: 12), child: ToolButton(Icons.create_new_folder_outlined, label: 'New', active: true, size: 38, onTap: () => _create(context))),
       ]),
-      body: ListenableBuilder(
+      body: PageWidth(child: ListenableBuilder(
         listenable: Listenable.merge([_everything, Settings.i]),
         builder: (context, _) {
           final folders = Library.i.folders;
@@ -348,7 +348,7 @@ class FoldersScreen extends StatelessWidget {
                 final w = (c.maxWidth - 24) / 3;
                 return Wrap(spacing: 12, runSpacing: 16, children: [
                   for (final f in folders)
-                    GestureDetector(
+                    Tap(
                       onTap: () => _open(context, folder: f),
                       onLongPress: () {
                         haptic(true);
@@ -405,7 +405,7 @@ class FoldersScreen extends StatelessWidget {
             ],
           ]);
         },
-      ),
+      )),
     );
   }
 }
@@ -502,10 +502,10 @@ class _FolderContentsState extends State<_FolderContents> {
               if (f != null) IconButton(tooltip: 'Edit folder', onPressed: () => showFolderEditor(context, folder: f, onDeleted: () => Navigator.of(context).maybePop()), icon: const Icon(Icons.edit_outlined)),
             ],
           ),
-          body: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
+          body: PageWidth(child: ListView(padding: const EdgeInsets.fromLTRB(20, 4, 20, 40), children: [
             if (f != null) ...[
               Row(children: [
-                GestureDetector(onTap: () => showFolderEditor(context, folder: f), child: SizedBox(width: 84, child: FolderCover(folder: f, kind: kind))),
+                Tap(onTap: () => showFolderEditor(context, folder: f), child: SizedBox(width: 84, child: FolderCover(folder: f, kind: kind))),
                 const SizedBox(width: 14),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -551,7 +551,7 @@ class _FolderContentsState extends State<_FolderContents> {
                 final w = (c.maxWidth - 24) / 3;
                 return Wrap(spacing: 12, runSpacing: 16, children: [
                   for (final i in items)
-                    GestureDetector(
+                    Tap(
                       onTap: () => i.open(context),
                       onLongPress: i.menu == null
                           ? null
@@ -568,7 +568,7 @@ class _FolderContentsState extends State<_FolderContents> {
                               Positioned(
                                 right: 4,
                                 top: 4,
-                                child: GestureDetector(
+                                child: Tap(
                                   onTap: () {
                                     haptic();
                                     i.toggle(f.id);
@@ -593,7 +593,7 @@ class _FolderContentsState extends State<_FolderContents> {
               }),
             if (!grid)
               for (final i in items)
-              GestureDetector(
+              Tap(
                 behavior: HitTestBehavior.opaque,
                 onTap: () => i.open(context),
                 onLongPress: i.menu == null
@@ -627,7 +627,7 @@ class _FolderContentsState extends State<_FolderContents> {
                   ]),
                 ),
               ),
-          ]),
+          ])),
         );
       },
     );
@@ -649,7 +649,7 @@ class _FolderContentsState extends State<_FolderContents> {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
                   Expanded(child: Text('Add to ${f.name}', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
-                  GestureDetector(onTap: () => Navigator.pop(ctx), child: Label('Done', color: t.accent, weight: FontWeight.w600)),
+                  Tap(onTap: () => Navigator.pop(ctx), child: Label('Done', color: t.accent, weight: FontWeight.w600)),
                 ]),
                 const SizedBox(height: 10),
                 SearchBox(historyKey: 'folder-add', onChanged: (v) => setS(() => q = v.trim().toLowerCase()), decoration: InputDecoration(hintText: 'Search your ${kind.plural}', prefixIcon: const Icon(Icons.search_sharp, size: 18))),
@@ -663,7 +663,7 @@ class _FolderContentsState extends State<_FolderContents> {
                           itemBuilder: (_, n) {
                             final i = all[n];
                             final on = i.folders.contains(f.id);
-                            return GestureDetector(
+                            return Tap(
                               behavior: HitTestBehavior.opaque,
                               onTap: () {
                                 haptic();

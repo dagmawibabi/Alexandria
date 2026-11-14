@@ -92,7 +92,7 @@ class _MetaSearchState extends State<_MetaSearch> {
                       itemCount: results.length,
                       itemBuilder: (_, i) {
                         final b = results[i];
-                        return GestureDetector(
+                        return Tap(
                           onTap: _picking == null ? () => _pick(b) : null,
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 8),

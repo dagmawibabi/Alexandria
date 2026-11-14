@@ -134,7 +134,8 @@ class _LightControlsState extends State<LightControls> {
         final s = Settings.i;
         final custom = Surface('custom', 'Custom', s.customBg, s.customFg);
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SliderRow(
+          // Desktop monitors don't take a brightness from apps; the dim and warmth filters below still work.
+          if (kMobile) SliderRow(
             label: 'Brightness',
             icon: Icons.light_mode_outlined,
             value: _b ?? .5,
@@ -148,7 +149,7 @@ class _LightControlsState extends State<LightControls> {
           ),
           SliderRow(label: 'Super dim', icon: Icons.dark_mode_outlined, value: s.dim, min: 0, max: .8, format: (v) => '${(v * 100).round()}', onChanged: (v) => s.dim = v),
           SliderRow(label: 'Warmth', icon: Icons.wb_twilight_outlined, value: s.warmth, min: 0, max: .6, format: (v) => '${(v * 100).round()}', onChanged: (v) => s.warmth = v),
-          Align(
+          if (kMobile) Align(
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () {
@@ -219,12 +220,12 @@ class MotionControls extends StatelessWidget {
           const SizedBox(height: 10),
           const Label('Gestures'),
           const SizedBox(height: 8),
-          Row(children: [const SizedBox(width: 96, child: Label('Brightness')), Expanded(child: _EdgePicker(value: s.brightnessEdge, onChanged: (v) => s.brightnessEdge = v))]),
+          if (kMobile) Row(children: [const SizedBox(width: 96, child: Label('Brightness')), Expanded(child: _EdgePicker(value: s.brightnessEdge, onChanged: (v) => s.brightnessEdge = v))]),
           const SizedBox(height: 8),
           Row(children: [const SizedBox(width: 96, child: Label('Font size')), Expanded(child: _EdgePicker(value: s.fontSizeEdge, onChanged: (v) => s.fontSizeEdge = v))]),
           ToggleRow(label: 'Tap zones', hint: 'Tap top/bottom to page, centre for controls', value: s.tapZones, onChanged: (v) => s.tapZones = v),
-          ToggleRow(label: 'Volume keys turn pages', hint: 'They change the volume while audio plays.', value: s.volumePaging, onChanged: (v) => s.volumePaging = v),
-          if (s.volumePaging) ...[
+          if (kMobile) ToggleRow(label: 'Volume keys turn pages', hint: 'They change the volume while audio plays.', value: s.volumePaging, onChanged: (v) => s.volumePaging = v),
+          if (kMobile && s.volumePaging) ...[
             const SizedBox(height: 4),
             const Label('Next page'),
             const SizedBox(height: 8),
@@ -232,7 +233,7 @@ class MotionControls extends StatelessWidget {
             const SizedBox(height: 8),
           ],
           ToggleRow(label: 'Keep screen awake', value: s.keepAwake, onChanged: (v) => s.keepAwake = v),
-          ToggleRow(label: 'Immersive (hide system bars)', value: s.immersive, onChanged: (v) => s.immersive = v),
+          if (kMobile) ToggleRow(label: 'Immersive (hide system bars)', value: s.immersive, onChanged: (v) => s.immersive = v),
           ToggleRow(label: 'Status line', hint: 'Chapter, progress and clock while reading', value: s.showReaderHud, onChanged: (v) => s.showReaderHud = v),
           ToggleRow(label: 'Clock in status line', value: s.showClock, onChanged: (v) => s.showClock = v),
           if (showListen) ...[

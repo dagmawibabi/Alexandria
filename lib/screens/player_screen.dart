@@ -131,115 +131,149 @@ class _PlayerScreenState extends State<PlayerScreen> {
             final episode = podcast ? Podcasts.i.episodeFor(b) : null;
             final text = podcast || live ? null : AudioLibrary.i.bookFor(b);
             final source = openSourceAction(context, b);
-            return ListView(padding: const EdgeInsets.fromLTRB(24, 4, 24, 32), children: [
-              Row(children: [
-                IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.keyboard_arrow_down_sharp, size: 28)),
-                Expanded(child: Center(child: Label(live ? 'Live radio' : podcast ? 'Podcast' : (b.streaming ? 'Streaming · ${_sourceName(b)}' : (b.offline ? 'Downloaded' : 'Now playing'))))),
-                IconButton(tooltip: 'Full screen', onPressed: () => openFullScreenPlayer(context), icon: const Icon(Icons.fullscreen_sharp)),
-                IconButton(
-                  onPressed: () {
-                    if (station != null) {
-                      showStationMenu(context, station);
-                    } else if (episode != null) {
-                      showEpisode(context, episode);
-                    } else {
-                      showAudiobookActions(context, b, fromPlayer: true);
-                    }
-                  },
-                  icon: const Icon(Icons.more_horiz_sharp),
-                ),
-              ]),
-              const SizedBox(height: 12),
-              Center(
-                child: SizedBox(
-                  width: math.min(w * .7, 320),
-                  child: SwipeCover(
-                    key: ValueKey('swipe-${b.id}'),
-                    book: b,
-                    // Swipe to switch; tap to see the art full screen.
-                    onTap: b.coverPath == null && b.coverUrl == null ? null : () => openImageViewer(context, path: b.coverPath, url: b.coverUrl, title: b.title),
-                    child: Hero(tag: 'audio-${b.id}', child: AudioCover(b)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 26),
-              SourceTitle(book: b, onTap: source),
-              const SizedBox(height: 14),
-              if (b.tracks.length > 1)
-                GestureDetector(
-                  onTap: () => _chapters(context),
-                  child: Column(children: [
-                    Label('Chapter ${b.trackIndex + 1} of ${b.tracks.length}', color: t.accent),
-                    const SizedBox(height: 3),
-                    Text(track?.title ?? '', textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.ink.withValues(alpha: .8))),
-                  ]),
-                )
-              else if (episode?.published != null)
-                Center(child: Label(fmtDate(episode!.published), color: t.accent)),
-              const SizedBox(height: 18),
-              if (live)
-                Center(
-                  child: Row(mainAxisSize: MainAxisSize.min, children: [
-                    Container(width: 8, height: 8, decoration: BoxDecoration(color: pl.playing ? t.accent : t.muted, shape: BoxShape.circle)),
-                    const SizedBox(width: 8),
-                    Label(pl.loading ? 'Connecting' : (pl.playing ? 'Live' : 'Paused'), color: t.ink, weight: FontWeight.w600),
-                  ]),
-                )
-              else
-                const PlayerScrubber(),
-              const SizedBox(height: 18),
-              const PlayerControls(),
-              if (pl.error != null) Padding(padding: const EdgeInsets.only(top: 14), child: Text(pl.error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFE5243B)))),
-              const SizedBox(height: 22),
-              Row(children: [
-                if (!live) ...[
-                  Expanded(child: _chip(context, Icons.speed_sharp, '${_speedLabel(b.speed)}×', () => _speed(context))),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(child: _chip(context, Icons.bedtime_outlined, _sleepLabel(pl), () => _sleepSheet(context), on: pl.sleepAt != null || pl.sleepAtTrackEnd)),
-                if (!live) const SizedBox(width: 8),
-                if (!live) Expanded(
-                  child: podcast
-                      ? _chip(context, Icons.queue_music_sharp, Podcasts.i.queue.isEmpty ? 'Queue' : 'Up next ${Podcasts.i.queue.length}', () => showQueue(context))
-                      : _chip(context, Icons.format_list_bulleted_sharp, 'Chapters', () => _chapters(context)),
-                ),
-              ]),
-              if (text != null) ...[
-                const SizedBox(height: 8),
-                _chip(context, Icons.menu_book_sharp, 'Read along', () => readAlong(context, b, text)),
-              ],
-              const SizedBox(height: 12),
-              MarksBar(
-                mark: station != null ? RadioDirectory.i.markOf(station.id) : (episode != null ? Podcasts.i.episodeMark(episode) : b.mark),
-                title: b.title,
-                changed: () {
+            final wide = isWide(context);
+            final header = Row(children: [
+              IconButton(onPressed: () => Navigator.pop(context), icon: const Icon(Icons.keyboard_arrow_down_sharp, size: 28)),
+              Expanded(child: Center(child: Label(live ? 'Live radio' : podcast ? 'Podcast' : (b.streaming ? 'Streaming · ${_sourceName(b)}' : (b.offline ? 'Downloaded' : 'Now playing'))))),
+              IconButton(tooltip: 'Full screen', onPressed: () => openFullScreenPlayer(context), icon: const Icon(Icons.fullscreen_sharp)),
+              IconButton(
+                onPressed: () {
                   if (station != null) {
-                    RadioDirectory.i.changed(station);
+                    showStationMenu(context, station);
                   } else if (episode != null) {
-                    Podcasts.i.marksChanged();
+                    showEpisode(context, episode);
                   } else {
-                    AudioLibrary.i.touch(b);
+                    showAudiobookActions(context, b, fromPlayer: true);
                   }
                 },
-                here: live ? null : () => (track: b.trackIndex, ms: pl.position.inMilliseconds),
-                onSeek: live ? null : (n) => pl.goTo(n.track, n.ms),
-                folders: station != null ? () => RadioDirectory.i.foldersOf(station.id) : (episode != null ? null : () => b.folderIds),
-                onFolder: station != null ? (id) => RadioDirectory.i.toggleFolder(station, id) : (episode != null ? null : (id) => AudioLibrary.i.toggleFolder(b, id)),
+                icon: const Icon(Icons.more_horiz_sharp),
               ),
-              if (!podcast && !live) ...[
-                const SizedBox(height: 16),
-                ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: b.progress, minHeight: 3)),
-                const SizedBox(height: 8),
-                Row(children: [
-                  Label('${(b.progress * 100).round()}% of book'),
-                  const Spacer(),
-                  if (left != null) Label('${fmtDuration(left.inSeconds)} left'),
+            ]);
+            final nowPlaying = <Widget>[
+            const SizedBox(height: 12),
+            Center(
+              child: SizedBox(
+                width: wide ? 360 : math.min(w * .7, 320),
+                child: SwipeCover(
+                  key: ValueKey('swipe-${b.id}'),
+                  book: b,
+                  // Swipe to switch; tap to see the art full screen.
+                  onTap: b.coverPath == null && b.coverUrl == null ? null : () => openImageViewer(context, path: b.coverPath, url: b.coverUrl, title: b.title),
+                  child: Hero(tag: 'audio-${b.id}', child: AudioCover(b)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 26),
+            SourceTitle(book: b, onTap: source),
+            const SizedBox(height: 14),
+            if (b.tracks.length > 1)
+              Tap(
+                onTap: () => _chapters(context),
+                child: Column(children: [
+                  Label('Chapter ${b.trackIndex + 1} of ${b.tracks.length}', color: t.accent),
+                  const SizedBox(height: 3),
+                  Text(track?.title ?? '', textAlign: TextAlign.center, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.ink.withValues(alpha: .8))),
                 ]),
+              )
+            else if (episode?.published != null)
+              Center(child: Label(fmtDate(episode!.published), color: t.accent)),
+            const SizedBox(height: 18),
+            if (live)
+              Center(
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Container(width: 8, height: 8, decoration: BoxDecoration(color: pl.playing ? t.accent : t.muted, shape: BoxShape.circle)),
+                  const SizedBox(width: 8),
+                  Label(pl.loading ? 'Connecting' : (pl.playing ? 'Live' : 'Paused'), color: t.ink, weight: FontWeight.w600),
+                ]),
+              )
+            else
+              const PlayerScrubber(),
+            const SizedBox(height: 18),
+            const PlayerControls(),
+            if (pl.error != null) Padding(padding: const EdgeInsets.only(top: 14), child: Text(pl.error!, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFE5243B)))),
+            const SizedBox(height: 22),
+            Row(children: [
+              if (!live) ...[
+                Expanded(child: _chip(context, Icons.speed_sharp, '${_speedLabel(b.speed)}×', () => _speed(context))),
+                const SizedBox(width: 8),
               ],
-              if (b.description.isNotEmpty) ...[
-                SectionHeader('', podcast ? 'Show notes' : 'About', padding: const EdgeInsets.fromLTRB(0, 28, 0, 10)),
-                CollapsibleText(b.description, lines: 4, style: TextStyle(height: 1.5, color: t.ink.withValues(alpha: .85))),
-              ],
+              Expanded(child: _chip(context, Icons.bedtime_outlined, _sleepLabel(pl), () => _sleepSheet(context), on: pl.sleepAt != null || pl.sleepAtTrackEnd)),
+              if (!live) const SizedBox(width: 8),
+              if (!live) Expanded(
+                child: podcast
+                    ? _chip(context, Icons.queue_music_sharp, Podcasts.i.queue.isEmpty ? 'Queue' : 'Up next ${Podcasts.i.queue.length}', () => showQueue(context))
+                    : _chip(context, Icons.format_list_bulleted_sharp, 'Chapters', () => _chapters(context)),
+              ),
+            ]),
+            if (text != null) ...[
+              const SizedBox(height: 8),
+              _chip(context, Icons.menu_book_sharp, 'Read along', () => readAlong(context, b, text)),
+            ],
+            const SizedBox(height: 12),
+            MarksBar(
+              mark: station != null ? RadioDirectory.i.markOf(station.id) : (episode != null ? Podcasts.i.episodeMark(episode) : b.mark),
+              title: b.title,
+              changed: () {
+                if (station != null) {
+                  RadioDirectory.i.changed(station);
+                } else if (episode != null) {
+                  Podcasts.i.marksChanged();
+                } else {
+                  AudioLibrary.i.touch(b);
+                }
+              },
+              here: live ? null : () => (track: b.trackIndex, ms: pl.position.inMilliseconds),
+              onSeek: live ? null : (n) => pl.goTo(n.track, n.ms),
+              folders: station != null ? () => RadioDirectory.i.foldersOf(station.id) : (episode != null ? null : () => b.folderIds),
+              onFolder: station != null ? (id) => RadioDirectory.i.toggleFolder(station, id) : (episode != null ? null : (id) => AudioLibrary.i.toggleFolder(b, id)),
+            ),
+            if (!podcast && !live) ...[
+              const SizedBox(height: 16),
+              ClipRRect(borderRadius: BorderRadius.circular(2), child: LinearProgressIndicator(value: b.progress, minHeight: 3)),
+              const SizedBox(height: 8),
+              Row(children: [
+                Label('${(b.progress * 100).round()}% of book'),
+                const Spacer(),
+                if (left != null) Label('${fmtDuration(left.inSeconds)} left'),
+              ]),
+            ],
+            ];
+            final about = <Widget>[
+            if (b.description.isNotEmpty) ...[
+              SectionHeader('', podcast ? 'Show notes' : 'About', padding: const EdgeInsets.fromLTRB(0, 28, 0, 10)),
+              CollapsibleText(b.description, lines: 4, style: TextStyle(height: 1.5, color: t.ink.withValues(alpha: .85))),
+            ],
+            ];
+            if (!wide) return ListView(padding: const EdgeInsets.fromLTRB(24, 4, 24, 32), children: [header, ...nowPlaying, ...about]);
+            // Desktop: the player on the left, the chapters and notes beside it.
+            return Column(children: [
+              Padding(padding: const EdgeInsets.fromLTRB(24, 4, 24, 0), child: header),
+              Expanded(
+                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Expanded(
+                    flex: 5,
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        child: ListView(padding: const EdgeInsets.fromLTRB(32, 0, 32, 32), children: nowPlaying),
+                      ),
+                    ),
+                  ),
+                  Container(width: 1, color: t.line),
+                  Expanded(
+                    flex: 4,
+                    child: ListView(padding: const EdgeInsets.fromLTRB(28, 8, 28, 32), children: [
+                      if (!podcast && !live && b.tracks.length > 1) ...[
+                        SectionHeader('', 'Chapters · ${b.tracks.length}', padding: const EdgeInsets.fromLTRB(0, 8, 0, 6)),
+                        for (var i = 0; i < b.tracks.length; i++) _chapterRow(context, b, i),
+                      ],
+                      ...about,
+                      if (about.isEmpty && (podcast || live || b.tracks.length <= 1))
+                        Padding(padding: const EdgeInsets.only(top: 28), child: Label(live ? 'Live radio · no chapters' : 'Nothing more about this one')),
+                    ]),
+                  ),
+                ]),
+              ),
             ]);
           },
         ),
@@ -261,7 +295,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
 
   Widget _chip(BuildContext context, IconData i, String label, VoidCallback onTap, {bool on = false}) {
     final t = Tokens.of(context);
-    return GestureDetector(
+    return Tap(
       onTap: () {
         haptic();
         onTap();
@@ -332,6 +366,31 @@ class _PlayerScreenState extends State<PlayerScreen> {
     });
   }
 
+  /// One chapter: tap to jump there. [picked] runs after (closing the sheet it sits in).
+  Widget _chapterRow(BuildContext context, Audiobook b, int i, {VoidCallback? picked}) {
+    final t = Tokens.of(context);
+    final tr = b.tracks[i];
+    final on = i == b.trackIndex;
+    return InkWell(
+      onTap: () {
+        haptic();
+        Player.i.jumpTo(i);
+        picked?.call();
+      },
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
+        decoration: BoxDecoration(border: Border(left: BorderSide(color: on ? t.accent : Colors.transparent, width: 3))),
+        child: Row(children: [
+          SizedBox(width: 34, child: Label(pad(i + 1), color: on ? t.accent : t.muted)),
+          Expanded(child: Text(tr.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.ink, fontWeight: on ? FontWeight.w700 : FontWeight.w500))),
+          if (on && Player.i.playing) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.graphic_eq_sharp, size: 16, color: t.accent)),
+          if (tr.ms > 0) Label(fmtClock(Duration(milliseconds: tr.ms))),
+          ChapterDownload(book: b, index: i),
+        ]),
+      ),
+    );
+  }
+
   void _chapters(BuildContext context) {
     showSheet(context, scroll: false, builder: (ctx) {
       final t = Tokens.of(ctx);
@@ -362,28 +421,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
               shrinkWrap: true,
               padding: const EdgeInsets.only(bottom: 20),
               itemCount: b.tracks.length,
-              itemBuilder: (_, i) {
-                final tr = b.tracks[i];
-                final on = i == b.trackIndex;
-                return InkWell(
-                  onTap: () {
-                    haptic();
-                    Player.i.jumpTo(i);
-                    Navigator.pop(ctx);
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(20, 6, 8, 6),
-                    decoration: BoxDecoration(border: Border(left: BorderSide(color: on ? t.accent : Colors.transparent, width: 3))),
-                    child: Row(children: [
-                      SizedBox(width: 34, child: Label(pad(i + 1), color: on ? t.accent : t.muted)),
-                      Expanded(child: Text(tr.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: t.ink, fontWeight: on ? FontWeight.w700 : FontWeight.w500))),
-                      if (on && Player.i.playing) Padding(padding: const EdgeInsets.only(right: 8), child: Icon(Icons.graphic_eq_sharp, size: 16, color: t.accent)),
-                      if (tr.ms > 0) Label(fmtClock(Duration(milliseconds: tr.ms))),
-                      ChapterDownload(book: b, index: i),
-                    ]),
-                  ),
-                );
-              },
+              itemBuilder: (_, i) => _chapterRow(ctx, b, i, picked: () => Navigator.pop(ctx)),
             ),
           ),
         ]),
@@ -672,7 +710,7 @@ class _BookPickerState extends State<_BookPicker> {
                   itemCount: books.length,
                   itemBuilder: (_, i) {
                     final b = books[i];
-                    return GestureDetector(
+                    return Tap(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => Navigator.pop(context, b),
                       child: Padding(
@@ -720,7 +758,7 @@ class MiniPlayer extends StatelessWidget {
     final t = Tokens.of(context);
     final r = ReadAloud.i;
     final b = r.book!;
-    return GestureDetector(
+    return Tap(
       onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ReaderScreen(book: b))),
       child: Container(
         margin: t.zen ? const EdgeInsets.fromLTRB(10, 0, 10, 8) : EdgeInsets.zero,
@@ -762,7 +800,7 @@ class MiniPlayer extends StatelessWidget {
         final b = pl.book;
         if (b == null) return const SizedBox.shrink();
         final dur = pl.duration.inMilliseconds;
-        return GestureDetector(
+        return Tap(
           onTap: () => Navigator.of(context).push(PlayerScreen.page()),
           child: Container(
             margin: t.zen ? const EdgeInsets.fromLTRB(10, 0, 10, 8) : EdgeInsets.zero,

@@ -4,13 +4,13 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.13.0
+  sdk: ^3.14.0
 
 dependencies:
   flutter:
     sdk: flutter
   material_ui: ^1.8.0
-  omni_ai: ^0.6.1
+  omni_ai: ^0.8.0
   pdfrx: ^2.10.1
   archive: ^4.0.0
   xml: ^6.5.0
@@ -31,6 +31,8 @@ dependencies:
   audio_service: ^0.18.19
   just_audio: ^0.10.6
   audio_session: ^0.2.4
+  just_audio_media_kit: ^2.1.0
+  media_kit_libs_windows_audio: ^1.0.9
 
 dev_dependencies:
   flutter_test:

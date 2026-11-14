@@ -607,6 +607,7 @@ export function initSite() {
     ['Stats', ['Daily goal ring and streaks', 'Yearly goals for books and audiobooks, weekly for episodes', 'Time by kind, and 14-day bars', 'Per-book reading speed and time left', 'Four home-screen widgets with your own font and colours']],
     ['Share', ['8 card styles, from Spec to Blueprint', 'Sizes for posts, feeds and stories', 'Any background colour and typeface', 'Cards for excerpts, highlights and bookmarks', 'Cards for audiobooks, podcasts and stations']],
     ['Look', ['Industrial and Zen designs for every screen', 'Monochrome mode', 'Light, dark or system theme', '11 accents, or any colour from a full picker', 'Corner radius, five interface fonts and the dot grid', 'Haptics you can turn off']],
+    ['Desktop', ['A Windows app as well as Android', 'Side rail of tabs and two-pane pages on wide windows', 'Arrow keys, Page Up, Page Down and Space turn pages; Esc steps back', 'Right-click for the same actions as a long press', 'Open books from File Explorer with Open with']],
     ['Your data', ['No account and no sign-in', 'Everything stored on your phone', 'Export or import everything as one JSON file', 'Catalogue pages saved on your phone, so they open when offline', 'Keys for AI and voices are yours and only needed for those features']],
   ];
   const sheetBody = $('#sheet-body');
@@ -660,7 +661,7 @@ export function initSite() {
   /* ---------- status line: the reader's progress bar, reading this page ---------- */
   const hud = $('#hud');
   const hudTrack = $('#hud-track');
-  const SECTIONS = [['top', 'Alexandria'], ['reader', 'Read'], ['companion', 'Ask'], ['listen', 'Listen'], ['track', 'Track'], ['share', 'Share'], ['looks', 'Looks'], ['sheet', 'Data sheet'], ['download', 'Download']];
+  const SECTIONS = [['top', 'Alexandria'], ['reader', 'Read'], ['companion', 'Ask'], ['listen', 'Listen'], ['track', 'Track'], ['share', 'Share'], ['desktop', 'Desktop'], ['looks', 'Looks'], ['sheet', 'Data sheet'], ['download', 'Download']];
   const navLinks = $$('.links a');
   let ticking = false;
   const updateHud = () => {

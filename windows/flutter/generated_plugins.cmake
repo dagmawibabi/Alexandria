@@ -6,11 +6,12 @@ list(APPEND FLUTTER_PLUGIN_LIST
   audioplayers_windows
   flutter_secure_storage_windows
   flutter_tts
+  media_kit_libs_windows_audio
   record_windows
   screen_brightness_windows
-  share_plus
   speech_to_text_windows
   url_launcher_windows
+  share_plus
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

@@ -41,38 +41,42 @@ class BookDetail extends StatelessWidget {
           final left = (book.wordCount * (1 - book.progress) / (wpm > 50 ? wpm : 230) * 60).round();
           final hls = lib.highlightsFor(book.id);
 
-          return ListView(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), children: [
-            Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              SizedBox(width: 130, child: ViewableImage(path: book.coverPath, title: book.title, child: Hero(tag: 'cover-${book.id}', child: Cover(book)))),
-              const SizedBox(width: 18),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(book.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.12, letterSpacing: -.4)),
-                  const SizedBox(height: 6),
-                  if (book.author.isNotEmpty) Text(book.author, style: TextStyle(color: t.muted, fontSize: 15)),
-                  const SizedBox(height: 14),
-                  Wrap(spacing: 6, runSpacing: 6, children: [
-                    Tag(book.formatLabel, color: t.accent),
-                    Tag(book.status.name),
-                    if (book.year.isNotEmpty) Tag(book.year),
-                    Tag('${(book.fileSize / 1048576).toStringAsFixed(1)} MB'),
-                  ]),
-                  const SizedBox(height: 14),
-                  _stars(context),
-                  const SizedBox(height: 10),
-                  Row(children: [
-                    ToolButton(book.favorite ? Icons.favorite_sharp : Icons.favorite_border_sharp, size: 40, active: book.favorite, tooltip: 'Favourite', onTap: () {
-                      book.favorite = !book.favorite;
-                      Library.i.touch(book);
-                    }),
-                    const SizedBox(width: 8),
-                    ToolButton(book.folderIds.isEmpty ? Icons.folder_outlined : Icons.folder_sharp, size: 40, active: book.folderIds.isNotEmpty, tooltip: 'Folders', onTap: () {
-                      showFolderPicker(context, title: book.title, selected: () => book.folderIds, onToggle: (id) => Library.i.toggleFolder(book, Library.i.folders.firstWhere((f) => f.id == id)));
-                    }),
-                  ]),
-                ]),
-              ),
+          final wide = isWide(context);
+          final cover = ViewableImage(path: book.coverPath, title: book.title, child: Hero(tag: 'cover-${book.id}', child: Cover(book)));
+          final info = <Widget>[
+            Text(book.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, height: 1.12, letterSpacing: -.4)),
+            const SizedBox(height: 6),
+            if (book.author.isNotEmpty) Text(book.author, style: TextStyle(color: t.muted, fontSize: 15)),
+            const SizedBox(height: 14),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              Tag(book.formatLabel, color: t.accent),
+              Tag(book.status.name),
+              if (book.year.isNotEmpty) Tag(book.year),
+              Tag('${(book.fileSize / 1048576).toStringAsFixed(1)} MB'),
             ]),
+            const SizedBox(height: 14),
+            _stars(context),
+            const SizedBox(height: 10),
+            Row(children: [
+              ToolButton(book.favorite ? Icons.favorite_sharp : Icons.favorite_border_sharp, size: 40, active: book.favorite, tooltip: 'Favourite', onTap: () {
+                book.favorite = !book.favorite;
+                Library.i.touch(book);
+              }),
+              const SizedBox(width: 8),
+              ToolButton(book.folderIds.isEmpty ? Icons.folder_outlined : Icons.folder_sharp, size: 40, active: book.folderIds.isNotEmpty, tooltip: 'Folders', onTap: () {
+                showFolderPicker(context, title: book.title, selected: () => book.folderIds, onToggle: (id) => Library.i.toggleFolder(book, Library.i.folders.firstWhere((f) => f.id == id)));
+              }),
+            ]),
+          ];
+
+          return SplitDetail(padding: const EdgeInsets.fromLTRB(20, 8, 20, 40), side: [
+            if (wide) ...[Center(child: SizedBox(width: 240, child: cover)), const SizedBox(height: 24), ...info]
+            else
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                SizedBox(width: 130, child: cover),
+                const SizedBox(width: 18),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: info)),
+              ]),
             const SizedBox(height: 20),
             Row(children: [
               Expanded(child: PrimaryButton(book.progress > 0 ? 'Continue · ${(book.progress * 100).round()}%' : 'Start reading', icon: Icons.menu_book_sharp, onTap: () => openBook(context, book))),
@@ -81,7 +85,7 @@ class BookDetail extends StatelessWidget {
               const SizedBox(width: 10),
               ToolButton(Icons.forum_outlined, size: 48, tooltip: 'Chat about this book', onTap: () => openAiChat(context, book)),
             ]),
-
+          ], main: [
             SectionHeader('01', t.zen ? 'Your reading' : 'Telemetry', padding: const EdgeInsets.fromLTRB(0, 28, 0, 12)),
             GridView.count(
               crossAxisCount: 3,
@@ -89,7 +93,7 @@ class BookDetail extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 8,
               crossAxisSpacing: 8,
-              childAspectRatio: 1.35,
+              childAspectRatio: wide ? 3.4 : 1.35,
               children: [
                 _Stat('Time', fmtDuration(secs)),
                 _Stat('Sessions', '${sessions.length}'),
@@ -152,7 +156,7 @@ class BookDetail extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(0, 28, 0, 12),
                 trailing: hls.isEmpty
                     ? null
-                    : GestureDetector(
+                    : Tap(
                         onTap: () => SharePlus.instance.share(ShareParams(text: lib.highlightsMarkdown(book), subject: book.title)),
                         child: Label('Export ↗', color: t.accent),
                       )),
@@ -271,7 +275,7 @@ class BookDetail extends StatelessWidget {
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
           Row(children: [
             const Expanded(child: Label('Edit record')),
-            GestureDetector(
+            Tap(
               onTap: () {
                 Navigator.pop(ctx);
                 _fetch(context);

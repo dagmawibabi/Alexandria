@@ -7,8 +7,8 @@
 </script>
 
 <svelte:head>
-	<title>Alexandria: read and listen on Android</title>
-	<meta name="description" content="A reader and listener built like a tool. PDF, EPUB and DOCX, audiobooks, podcasts and world radio in one Android app. Free, with no account.">
+	<title>Alexandria: read and listen on Android and Windows</title>
+	<meta name="description" content="A reader and listener built like a tool. PDF, EPUB and DOCX, audiobooks, podcasts and world radio in one app for Android and Windows. Free, with no account.">
 	<meta name="theme-color" content="#E8E6E1">
 	<meta property="og:title" content="Alexandria">
 	<meta property="og:description" content="One machine for everything you read and hear.">
@@ -28,6 +28,7 @@
     <a href="#listen">Listen</a>
     <a href="#track">Track</a>
     <a href="#share">Share</a>
+    <a href="#desktop">Desktop</a>
     <a href="#looks">Looks</a>
     <a href="#sheet">Data sheet</a>
   </nav>
@@ -51,6 +52,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6zM4 19h16v2H4z"/></svg>
           Download for Android
         </a>
+        <a class="btn" data-download href="#desktop">Windows app</a>
         <a class="btn" href="https://github.com/dagmawibabi/Alexandria">Source on GitHub</a>
       </div>
     </div>
@@ -262,6 +264,40 @@
   </div>
 </section>
 
+<section id="desktop" class="plate" aria-labelledby="desk-h">
+  <div class="wrap">
+    <div class="head">
+      <h2 id="desk-h">On your desk, too</h2>
+      <p>Alexandria also runs on Windows. Same library, same reader, same players, laid out for a big screen and a keyboard.</p>
+    </div>
+    <div class="desk-grid">
+      <figure class="desk">
+        <img src="/assets/shots/desktop-player.webp" loading="lazy" width="1600" height="950" alt="Alexandria on Windows: the audiobook player with its controls on the left and the chapter list on the right, beside the side rail of tabs.">
+      </figure>
+      <figure class="desk desk-second">
+        <img src="/assets/shots/desktop-detail.webp" loading="lazy" width="1600" height="950" alt="A free LibriVox audiobook in the Windows app: cover and actions in one column, the about text and chapters in another.">
+      </figure>
+    </div>
+    <div class="desk-foot">
+      <ul class="plain">
+        <li><b>Made for a wide window.</b> A side rail of tabs on every page, details in two panes, and text kept to a column you can read.</li>
+        <li><b>Keyboard and mouse.</b> Arrow keys, Page Up, Page Down and Space turn pages. Esc steps back. Right-click for a book's actions.</li>
+        <li><b>Open with Alexandria.</b> Open a PDF, EPUB or DOCX with it from File Explorer and it goes straight to the page.</li>
+        <li><b>Take your library along.</b> Export a backup on your phone and import it on your PC, or the other way round.</li>
+      </ul>
+      <div>
+        <div class="cta">
+          <a class="btn btn-signal" data-download href="https://github.com/dagmawibabi/Alexandria/releases/latest">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6zM4 19h16v2H4z"/></svg>
+            Download for Windows
+          </a>
+        </div>
+        <p class="note">Windows 10 or 11, 64-bit. Get the Windows .zip from the latest GitHub release, unzip it anywhere and run Alexandria.exe. Windows may warn about an unknown publisher the first time: choose More info, then Run anyway.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section id="looks" class="plate" aria-labelledby="looks-h">
   <div class="wrap split split-looks">
     <div>
@@ -313,8 +349,8 @@
       <span class="big-ring-in"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6zM4 19h16v2H4z"/></svg></span>
     </a>
     <div>
-      <h2 id="end-h">Put it on your phone</h2>
-      <p>Alexandria is an Android app. Get the latest APK from the GitHub releases page and open it on your phone. Android may ask you to allow installs from your browser the first time.</p>
+      <h2 id="end-h">Put it on your phone, or your PC</h2>
+      <p>Get the latest release from GitHub. On Android, open the APK on your phone; Android may ask you to allow installs from your browser the first time. On Windows, unzip the Windows build and run Alexandria.exe.</p>
       <div class="cta">
         <a class="btn btn-signal" data-download href="https://github.com/dagmawibabi/Alexandria/releases">Go to the releases page</a>
         <a class="btn btn-ghost" href="https://github.com/dagmawibabi/Alexandria">Read the source</a>
@@ -322,7 +358,7 @@
     </div>
   </div>
   <footer class="foot wrap">
-    <p>No account and no sign-in. Your library lives on your phone, and a full backup is one JSON file.</p>
+    <p>No account and no sign-in. Your library lives on your device, and a full backup is one JSON file.</p>
     <p>The screenshots are real app screens with demo data. Moby-Dick and the other books shown are in the public domain.</p>
   </footer>
 </section>

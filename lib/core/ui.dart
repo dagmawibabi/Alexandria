@@ -8,7 +8,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../models/book.dart';
 import 'net_image.dart';
 import 'settings.dart';
+import 'layout.dart';
 import 'theme.dart';
+
+export 'layout.dart';
 
 /// Greys out [child] (cover art) when the monochrome theme is on.
 Widget monoImage(Widget child) {
@@ -99,7 +102,7 @@ class SeeAll extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => GestureDetector(
+  Widget build(BuildContext context) => Tap(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
         child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Label('See all', color: Tokens.of(context).accent, weight: FontWeight.w600)),
@@ -164,7 +167,7 @@ class Panel extends StatelessWidget {
       child: child,
     );
     if (onTap == null) return box;
-    return GestureDetector(behavior: HitTestBehavior.opaque, onTap: () {
+    return Tap(behavior: HitTestBehavior.opaque, onTap: () {
       haptic();
       onTap!();
     }, child: box);
@@ -188,7 +191,7 @@ class ToolButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final fg = active ? t.onAccent : (color ?? t.ink);
-    Widget w = GestureDetector(
+    Widget w = Tap(
       behavior: HitTestBehavior.opaque,
       onTap: onTap == null
           ? null
@@ -235,7 +238,7 @@ class PrimaryButton extends StatelessWidget {
     final fg = ghost ? t.ink : t.onAccent;
     return Opacity(
       opacity: onTap == null ? .4 : 1,
-      child: GestureDetector(
+      child: Tap(
         onTap: onTap == null
             ? null
             : () {
@@ -284,7 +287,7 @@ class Segmented<T> extends StatelessWidget {
       child: Row(children: [
         for (var i = 0; i < values.length; i++)
           Expanded(
-            child: GestureDetector(
+            child: Tap(
               behavior: HitTestBehavior.opaque,
               onTap: () {
                 haptic();
@@ -392,7 +395,7 @@ class Toggle extends StatelessWidget {
         trackOutlineColor: const WidgetStatePropertyAll(Colors.transparent),
       );
     }
-    return GestureDetector(
+    return Tap(
       onTap: () {
         haptic();
         onChanged(!value);
@@ -460,7 +463,7 @@ class Tag extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = Tokens.of(context);
     final c = color ?? t.ink;
-    return GestureDetector(
+    return Tap(
       onTap: onTap == null
           ? null
           : () {
@@ -529,7 +532,12 @@ Future<T?> showSheet<T>(BuildContext context, {required Widget Function(BuildCon
     useSafeArea: true,
     showDragHandle: false,
     // A min width as well, or a sheet with short content shrinks to fit it.
-    constraints: BoxConstraints(minWidth: MediaQuery.of(context).size.width, maxHeight: MediaQuery.of(context).size.height * maxHeight),
+    // On a wide window the sheet keeps to a readable width, centred.
+    constraints: BoxConstraints(
+      minWidth: isWide(context) ? 640 : MediaQuery.of(context).size.width,
+      maxWidth: isWide(context) ? 640 : double.infinity,
+      maxHeight: MediaQuery.of(context).size.height * maxHeight,
+    ),
     builder: (ctx) {
       final t = Tokens.of(ctx);
       return Padding(
@@ -764,7 +772,7 @@ class _CollapsibleTextState extends State<CollapsibleText> {
       painter.dispose();
       return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // The text itself is a toggle too, not just the button under it.
-        GestureDetector(
+        Tap(
           behavior: HitTestBehavior.opaque,
           onTap: long ? _toggle : null,
           child: AnimatedSize(
@@ -775,7 +783,7 @@ class _CollapsibleTextState extends State<CollapsibleText> {
           ),
         ),
         if (long)
-          GestureDetector(
+          Tap(
             behavior: HitTestBehavior.opaque,
             onTap: _toggle,
             child: Padding(
@@ -804,7 +812,7 @@ class RatingBar extends StatelessWidget {
     final t = Tokens.of(context);
     return Row(mainAxisSize: MainAxisSize.min, children: [
       for (var i = 1; i <= 5; i++)
-        GestureDetector(
+        Tap(
           behavior: HitTestBehavior.opaque,
           onTap: () {
             haptic();

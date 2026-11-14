@@ -112,7 +112,7 @@ class _ActiveRow extends StatelessWidget {
         if (left != null) _left(left),
       ].join(' · ');
     }
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: w.open,
       child: Panel(
@@ -152,7 +152,7 @@ class EpisodeDownloadsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(title: AppTitle('Downloaded episodes')),
       bottomNavigationBar: const PagePlayer(),
-      body: ListenableBuilder(
+      body: PageWidth(child: ListenableBuilder(
         // Not the player, which ticks several times a second: rows follow it themselves.
         listenable: Listenable.merge([Podcasts.i, Downloads.i]),
         builder: (context, _) {
@@ -165,7 +165,7 @@ class EpisodeDownloadsScreen extends StatelessWidget {
             for (final s in episodes) EpisodeRow(episode: s.episode, showShow: true),
           ]);
         },
-      ),
+      )),
     );
   }
 }
@@ -211,7 +211,7 @@ class _BookRow extends StatelessWidget {
     final size = b.tracks.fold(0, (a, x) => a + (x.remote ? 0 : _fileSize(x.path)));
     final fromFiles = b.source == 'local';
     final active = Player.i.book?.id == b.id;
-    return GestureDetector(
+    return Tap(
       behavior: HitTestBehavior.opaque,
       onTap: () => openAudiobook(context, b),
       onLongPress: () => showAudiobookActions(context, b),

@@ -76,7 +76,7 @@ class _AiKeysPanelState extends State<AiKeysPanel> {
               Container(width: 8, height: 8, decoration: BoxDecoration(shape: BoxShape.circle, color: _has(id) ? const Color(0xFF00C27A) : t.line)),
               const SizedBox(width: 8),
               Expanded(child: Text(_info[id]!.$1, style: const TextStyle(fontWeight: FontWeight.w600))),
-              GestureDetector(onTap: () => launchUrlString(_info[id]!.$3, mode: LaunchMode.externalApplication), child: Label('Get key ↗', color: t.accent)),
+              Tap(onTap: () => launchUrlString(_info[id]!.$3, mode: LaunchMode.externalApplication), child: Label('Get key ↗', color: t.accent)),
             ]),
             const SizedBox(height: 4),
             Text(_info[id]!.$2, style: TextStyle(color: t.muted, fontSize: 12.5)),
@@ -137,7 +137,7 @@ Widget _modelRow(BuildContext ctx, String id, String name, VoidCallback changed)
   final selected = Settings.i.aiModel == id;
   final provider = id.split(':').first;
   final ok = provider == 'google' ? Ai.omni.google.isConfigured : Ai.omni.gateway.isConfigured;
-  return GestureDetector(
+  return Tap(
     onTap: () {
       haptic();
       Settings.i.aiModel = id;
@@ -512,7 +512,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         ]),
         actions: [IconButton(onPressed: () => pickModel(context).then((_) => setState(() {})), icon: const Icon(Icons.memory_sharp))],
       ),
-      body: Column(children: [
+      body: PageWidth(child: Column(children: [
         Expanded(
           child: ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(16, 8, 16, 16), children: [
             if (widget.passage != null)
@@ -586,7 +586,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             }),
           ]),
         ),
-      ]),
+      ])),
     );
   }
 }
